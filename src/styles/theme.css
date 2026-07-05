@@ -1,0 +1,60 @@
+/*
+ * Design tokens. Everything visual references these variables, so the entire
+ * look can be re-skinned here without touching a single component.
+ * Values are raw "H S% L%" triplets so Tailwind can apply opacity modifiers.
+ */
+
+:root,
+.dark {
+  --background: 222 16% 6%;
+  --foreground: 220 14% 96%;
+
+  --surface: 222 15% 8%;
+  --surface-elevated: 222 14% 11%;
+
+  --muted: 220 12% 15%;
+  --muted-foreground: 220 8% 58%;
+
+  --border: 220 12% 16%;
+  --input: 220 12% 18%;
+  --ring: 250 70% 62%;
+
+  --primary: 250 70% 62%;
+  --primary-foreground: 0 0% 100%;
+
+  --accent: 220 13% 14%;
+  --accent-foreground: 220 14% 96%;
+
+  --success: 150 55% 48%;
+  --danger: 0 72% 58%;
+  --warning: 38 92% 55%;
+
+  --radius: 0.75rem;
+}
+
+/* Light theme scaffold — not used yet, but the tokens exist so a theme
+   toggle can be added later with zero component changes. */
+.light {
+  --background: 220 20% 98%;
+  --foreground: 222 20% 12%;
+
+  --surface: 0 0% 100%;
+  --surface-elevated: 220 20% 99%;
+
+  --muted: 220 15% 94%;
+  --muted-foreground: 220 9% 44%;
+
+  --border: 220 15% 89%;
+  --input: 220 15% 85%;
+  --ring: 250 70% 58%;
+
+  --primary: 250 70% 58%;
+  --primary-foreground: 0 0% 100%;
+
+  --accent: 220 15% 95%;
+  --accent-foreground: 222 20% 12%;
+
+  --success: 150 55% 40%;
+  --danger: 0 72% 50%;
+  --warning: 38 92% 48%;
+}
