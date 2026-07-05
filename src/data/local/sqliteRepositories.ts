@@ -647,6 +647,22 @@ const settingsRepository: SettingsRepository = {
   },
 };
 
+async function resetDatabase(): Promise<void> {
+  const db = await getDb();
+  // Order respects foreign keys; settings reseeds a default on next read.
+  for (const table of [
+    "trade_images",
+    "trade_notes",
+    "trades",
+    "accounts",
+    "mental_checks",
+    "chess_stats",
+    "settings",
+  ]) {
+    await db.execute(`DELETE FROM ${table}`);
+  }
+}
+
 /** Assemble the SQLite-backed repositories bundle used inside Tauri. */
 export function createSqliteRepositories(): Repositories {
   return {
@@ -658,5 +674,6 @@ export function createSqliteRepositories(): Repositories {
     chessStats: chessStatsRepository,
     settings: settingsRepository,
     images: tauriImageStorage,
+    reset: resetDatabase,
   };
 }

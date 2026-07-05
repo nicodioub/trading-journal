@@ -1,3 +1,4 @@
+import { format, startOfWeek } from "date-fns";
 import {
   accountSchema,
   chessStatsSchema,
@@ -310,6 +311,18 @@ export function createMemoryRepositories(): Repositories {
     },
 
     images,
+
+    async reset() {
+      store.accounts = [];
+      store.trades = [];
+      store.tradeImages = [];
+      store.tradeNotes = [];
+      store.mentalChecks = [];
+      store.chessStats = [];
+      store.settings = null;
+      store.images.clear();
+      store.persist();
+    },
   };
 
   // Populate a realistic sample dataset the first time in dev, so the UI and
@@ -371,6 +384,37 @@ async function seedDemoData(repos: Repositories): Promise<void> {
       emotionAfter: isWin ? "Confident" : "Frustrated",
       lessons: "",
       tags: i % 3 === 0 ? ["A+ setup"] : [],
+    });
+
+    // A matching daily check-in, biased by the day's result so the Mind page
+    // has a visible (demo) correlation to explore.
+    const dayStr = format(new Date(now - daysAgo * 86400000), "yyyy-MM-dd");
+    const rnd = (base: number, spread: number) =>
+      base + Math.floor(Math.random() * spread);
+    await repos.mentalChecks.save({
+      date: dayStr,
+      mood: isWin ? rnd(6, 4) : rnd(3, 3),
+      confidence: isWin ? rnd(6, 4) : rnd(3, 4),
+      stress: isWin ? rnd(2, 4) : rnd(5, 5),
+      energy: isWin ? rnd(6, 4) : rnd(3, 4),
+      sleptWell: isWin ? Math.random() > 0.3 : Math.random() > 0.6,
+      notes: "",
+    });
+  }
+
+  // A few weeks of chess to seed the cognitive thermometer.
+  for (let w = 0; w < 5; w += 1) {
+    const weekStart = format(
+      startOfWeek(new Date(now - w * 7 * 86400000), { weekStartsOn: 1 }),
+      "yyyy-MM-dd",
+    );
+    const played = 8 + Math.floor(Math.random() * 12);
+    const won = Math.floor(played * (0.4 + Math.random() * 0.4));
+    await repos.chessStats.save({
+      weekStart,
+      gamesPlayed: played,
+      gamesWon: won,
+      gamesLost: played - won,
     });
   }
 }

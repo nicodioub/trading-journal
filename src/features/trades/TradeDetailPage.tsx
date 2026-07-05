@@ -1,4 +1,4 @@
-import { ArrowLeft, Save, Trash2 } from "lucide-react";
+import { ArrowLeft, Pencil, Save, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import {
@@ -98,19 +98,27 @@ export function TradeDetailPage() {
             </p>
           </div>
         </div>
-        <ConfirmDialog
-          title="Delete trade?"
-          description="This permanently deletes the trade, its screenshots and notes."
-          onConfirm={async () => {
-            await deleteTrade.mutateAsync(trade.id);
-            navigate("/trades");
-          }}
-          trigger={
-            <Button variant="ghost" size="icon">
-              <Trash2 className="h-4 w-4 text-danger" />
-            </Button>
-          }
-        />
+        <div className="flex items-center gap-2">
+          <Button asChild variant="secondary" size="sm">
+            <Link to={`/trades/${trade.id}/edit`}>
+              <Pencil className="h-4 w-4" />
+              Edit
+            </Link>
+          </Button>
+          <ConfirmDialog
+            title="Delete trade?"
+            description="This permanently deletes the trade, its screenshots and notes."
+            onConfirm={async () => {
+              await deleteTrade.mutateAsync(trade.id);
+              navigate("/trades");
+            }}
+            trigger={
+              <Button variant="ghost" size="icon">
+                <Trash2 className="h-4 w-4 text-danger" />
+              </Button>
+            }
+          />
+        </div>
       </div>
 
       <Card>

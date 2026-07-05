@@ -1,13 +1,39 @@
+import { lazy } from "react";
 import { createHashRouter } from "react-router-dom";
 import { AppLayout } from "@/components/layout";
-import { AccountDetailPage } from "@/features/accounts/AccountDetailPage";
-import { AccountsPage } from "@/features/accounts/AccountsPage";
-import { DashboardPage } from "@/features/dashboard/DashboardPage";
-import { SettingsPage } from "@/features/settings/SettingsPage";
-import { StatisticsPage } from "@/features/statistics/StatisticsPage";
-import { NewTradePage } from "@/features/trades/NewTradePage";
-import { TradeDetailPage } from "@/features/trades/TradeDetailPage";
-import { TradeHistoryPage } from "@/features/trades/TradeHistoryPage";
+
+// Feature pages are lazy-loaded so the initial bundle only carries the shell.
+// Each import maps the named export to `default` for React.lazy.
+const DashboardPage = lazy(() =>
+  import("@/features/dashboard/DashboardPage").then((m) => ({ default: m.DashboardPage })),
+);
+const AccountsPage = lazy(() =>
+  import("@/features/accounts/AccountsPage").then((m) => ({ default: m.AccountsPage })),
+);
+const AccountDetailPage = lazy(() =>
+  import("@/features/accounts/AccountDetailPage").then((m) => ({ default: m.AccountDetailPage })),
+);
+const TradeHistoryPage = lazy(() =>
+  import("@/features/trades/TradeHistoryPage").then((m) => ({ default: m.TradeHistoryPage })),
+);
+const NewTradePage = lazy(() =>
+  import("@/features/trades/NewTradePage").then((m) => ({ default: m.NewTradePage })),
+);
+const EditTradePage = lazy(() =>
+  import("@/features/trades/EditTradePage").then((m) => ({ default: m.EditTradePage })),
+);
+const TradeDetailPage = lazy(() =>
+  import("@/features/trades/TradeDetailPage").then((m) => ({ default: m.TradeDetailPage })),
+);
+const StatisticsPage = lazy(() =>
+  import("@/features/statistics/StatisticsPage").then((m) => ({ default: m.StatisticsPage })),
+);
+const MindPage = lazy(() =>
+  import("@/features/mind/MindPage").then((m) => ({ default: m.MindPage })),
+);
+const SettingsPage = lazy(() =>
+  import("@/features/settings/SettingsPage").then((m) => ({ default: m.SettingsPage })),
+);
 
 /**
  * Hash-based routing — the safe choice for a packaged desktop app served from
@@ -24,7 +50,9 @@ export const router = createHashRouter([
       { path: "trades", element: <TradeHistoryPage /> },
       { path: "trades/new", element: <NewTradePage /> },
       { path: "trades/:tradeId", element: <TradeDetailPage /> },
+      { path: "trades/:tradeId/edit", element: <EditTradePage /> },
       { path: "statistics", element: <StatisticsPage /> },
+      { path: "mind", element: <MindPage /> },
       { path: "settings", element: <SettingsPage /> },
     ],
   },

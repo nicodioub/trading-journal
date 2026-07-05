@@ -1,5 +1,6 @@
 import {
   BarChart3,
+  Brain,
   History,
   LayoutDashboard,
   PlusCircle,
@@ -24,6 +25,7 @@ const NAV_ITEMS: NavItem[] = [
   { to: "/trades/new", label: "New Trade", icon: PlusCircle },
   { to: "/trades", label: "Trade History", icon: History, end: true },
   { to: "/statistics", label: "Statistics", icon: BarChart3 },
+  { to: "/mind", label: "Mind", icon: Brain },
   { to: "/settings", label: "Settings", icon: Settings },
 ];
 

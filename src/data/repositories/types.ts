@@ -107,4 +107,6 @@ export interface Repositories {
   chessStats: ChessStatsRepository;
   settings: SettingsRepository;
   images: ImageStorage;
+  /** Wipe all data (used by backup-restore and the Settings reset). */
+  reset(): Promise<void>;
 }

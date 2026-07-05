@@ -1,5 +1,6 @@
-import { Check } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { Check, Download, Trash2, Upload } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import { PageHeader } from "@/components/layout";
 import {
   Button,
@@ -8,6 +9,13 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
+  ConfirmDialog,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
   Input,
   Label,
   Select,
@@ -17,17 +25,31 @@ import {
   SelectValue,
   Textarea,
 } from "@/components/ui";
-import { isTauri, useSettings, useUpdateSettings } from "@/data";
+import { isTauri, useRepositories, useSettings, useUpdateSettings } from "@/data";
 import type { Theme } from "@/domain";
+import {
+  downloadBackup,
+  exportData,
+  importData,
+  isBackupData,
+  type BackupData,
+} from "./backup";
 
 export function SettingsPage() {
   const { data: settings } = useSettings();
   const update = useUpdateSettings();
+  const repos = useRepositories();
+  const qc = useQueryClient();
 
   const [motivationalQuote, setQuote] = useState("");
   const [defaultCurrency, setCurrency] = useState("USD");
   const [defaultRiskPercent, setRisk] = useState("1");
   const [theme, setTheme] = useState<Theme>("dark");
+
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [pendingImport, setPendingImport] = useState<BackupData | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
 
   useEffect(() => {
     if (settings) {
@@ -45,6 +67,44 @@ export function SettingsPage() {
       defaultRiskPercent: Number(defaultRiskPercent) || 0,
       theme,
     });
+
+  const handleExport = async () => {
+    downloadBackup(await exportData(repos));
+    setMessage("Backup exported.");
+  };
+
+  const handleFile = async (file: File | undefined) => {
+    if (!file) return;
+    try {
+      const parsed = JSON.parse(await file.text());
+      if (!isBackupData(parsed)) {
+        setMessage("That file isn't a valid backup.");
+        return;
+      }
+      setPendingImport(parsed);
+    } catch {
+      setMessage("Could not read that file.");
+    }
+  };
+
+  const runImport = async (replace: boolean) => {
+    if (!pendingImport) return;
+    setBusy(true);
+    try {
+      await importData(repos, pendingImport, { replace });
+      await qc.invalidateQueries();
+      setPendingImport(null);
+      setMessage(replace ? "Backup restored." : "Backup imported.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleReset = async () => {
+    await repos.reset();
+    await qc.invalidateQueries();
+    setMessage("All data cleared.");
+  };
 
   return (
     <div>
@@ -105,19 +165,6 @@ export function SettingsPage() {
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>About</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-1 text-sm text-muted-foreground">
-            <p>Trading Journal v0.1.0</p>
-            <p>
-              Storage: {isTauri() ? "Local SQLite database (offline)" : "Browser (dev preview)"}
-            </p>
-            <p>All your data stays on this device.</p>
-          </CardContent>
-        </Card>
-
         <div className="flex items-center justify-end gap-3">
           {update.isSuccess && (
             <span className="flex items-center gap-1 text-xs text-success">
@@ -128,7 +175,109 @@ export function SettingsPage() {
             Save settings
           </Button>
         </div>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Data & backup</CardTitle>
+            <CardDescription>
+              Everything is stored locally on this device. Export regularly to stay safe.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="flex flex-wrap gap-3">
+              <Button variant="secondary" onClick={handleExport}>
+                <Download className="h-4 w-4" />
+                Export backup
+              </Button>
+              <Button variant="secondary" onClick={() => fileRef.current?.click()}>
+                <Upload className="h-4 w-4" />
+                Import backup
+              </Button>
+              <input
+                ref={fileRef}
+                type="file"
+                accept="application/json"
+                className="hidden"
+                onChange={(e) => {
+                  void handleFile(e.target.files?.[0]);
+                  e.target.value = "";
+                }}
+              />
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Screenshots aren't included in the JSON backup — accounts, trades,
+              notes, mental checks and chess stats are.
+            </p>
+            {message && <p className="text-xs text-success">{message}</p>}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>About</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-1 text-sm text-muted-foreground">
+            <p>Trading Journal v0.1.0</p>
+            <p>
+              Storage:{" "}
+              {isTauri() ? "Local SQLite database (offline)" : "Browser (dev preview)"}
+            </p>
+            <p>All your data stays on this device.</p>
+          </CardContent>
+        </Card>
+
+        <Card className="border-danger/30">
+          <CardHeader>
+            <CardTitle className="text-danger">Danger zone</CardTitle>
+            <CardDescription>
+              Permanently delete all data on this device.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ConfirmDialog
+              title="Delete all data?"
+              description="This wipes every account, trade, note, mental check and chess record. Export a backup first."
+              confirmLabel="Delete everything"
+              onConfirm={handleReset}
+              trigger={
+                <Button variant="danger">
+                  <Trash2 className="h-4 w-4" />
+                  Reset all data
+                </Button>
+              }
+            />
+          </CardContent>
+        </Card>
       </div>
+
+      <Dialog
+        open={pendingImport !== null}
+        onOpenChange={(open) => {
+          if (!open) setPendingImport(null);
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Import backup</DialogTitle>
+            <DialogDescription>
+              This file contains {pendingImport?.accounts.length ?? 0} account(s) and{" "}
+              {pendingImport?.trades.length ?? 0} trade(s). Replace your current data
+              with it, or merge it in?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setPendingImport(null)}>
+              Cancel
+            </Button>
+            <Button variant="secondary" onClick={() => runImport(false)} disabled={busy}>
+              Merge
+            </Button>
+            <Button variant="danger" onClick={() => runImport(true)} disabled={busy}>
+              Replace all
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

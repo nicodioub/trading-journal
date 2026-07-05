@@ -4,6 +4,7 @@ export interface ChartTokens {
   primary: string;
   success: string;
   danger: string;
+  warning: string;
   grid: string;
   axis: string;
   muted: string;
@@ -13,6 +14,7 @@ const FALLBACK: ChartTokens = {
   primary: "hsl(250 70% 62%)",
   success: "hsl(150 55% 48%)",
   danger: "hsl(0 72% 58%)",
+  warning: "hsl(38 92% 55%)",
   grid: "hsl(220 12% 16%)",
   axis: "hsl(220 8% 58%)",
   muted: "hsl(220 8% 58%)",
@@ -37,6 +39,7 @@ export function useChartTokens(): ChartTokens {
       primary: readToken("--primary") ?? FALLBACK.primary,
       success: readToken("--success") ?? FALLBACK.success,
       danger: readToken("--danger") ?? FALLBACK.danger,
+      warning: readToken("--warning") ?? FALLBACK.warning,
       grid: readToken("--border") ?? FALLBACK.grid,
       axis: readToken("--muted-foreground") ?? FALLBACK.axis,
       muted: readToken("--muted-foreground") ?? FALLBACK.muted,
