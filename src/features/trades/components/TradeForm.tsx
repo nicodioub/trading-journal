@@ -1,6 +1,6 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
-import { Save } from "lucide-react";
+import { AlertTriangle, Save } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
@@ -21,6 +21,7 @@ import {
 import {
   useAccounts,
   useCreateTrade,
+  useReadinessRuleForDate,
   useRepositories,
   useSettings,
   useTradeImages,
@@ -166,6 +167,9 @@ export function TradeForm({ trade }: { trade?: Trade }) {
 
   const visibleExisting = existingImages.filter((img) => !removedImageIds.has(img.id));
 
+  const { data: readinessRule } = useReadinessRuleForDate(form.date.slice(0, 10));
+  const showReadinessWarning = readinessRule && readinessRule.status !== "ok";
+
   const handleSubmit = async () => {
     const entry = parseNum(form.entryPrice);
     if (!form.accountId) return setError("Select an account for this trade.");
@@ -243,6 +247,18 @@ export function TradeForm({ trade }: { trade?: Trade }) {
 
   return (
     <div className="space-y-6">
+      {showReadinessWarning && (
+        <div className="flex items-start gap-3 rounded-lg border border-warning/40 bg-warning/10 px-4 py-3 text-sm text-warning">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+          <div>
+            <p className="font-medium">
+              {readinessRule.status === "no_trade" ? "This date is marked No-Trade." : "This date is marked Caution."}
+            </p>
+            {readinessRule.reason && <p className="text-warning/80">{readinessRule.reason}</p>}
+          </div>
+        </div>
+      )}
+
       <Card>
         <CardHeader>
           <CardTitle>Trade</CardTitle>

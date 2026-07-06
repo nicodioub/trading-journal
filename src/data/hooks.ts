@@ -6,10 +6,14 @@ import {
 import type {
   AccountInput,
   ChessStatsInput,
+  FirstThoughtInput,
+  JournalEntryInput,
   MentalCheckInput,
+  ReadinessRuleInput,
   Settings,
   TradeImageInput,
   TradeInput,
+  TradingRuleInput,
 } from "@/domain";
 import { useRepositories } from "./RepositoryProvider";
 import type { TradeFilters } from "./repositories";
@@ -24,8 +28,14 @@ export const queryKeys = {
   tradeNote: (tradeId: string) => ["tradeNote", tradeId] as const,
   mentalChecks: ["mentalChecks"] as const,
   mentalCheck: (date: string) => ["mentalCheck", date] as const,
+  firstThoughts: ["firstThoughts"] as const,
+  firstThought: (date: string) => ["firstThought", date] as const,
+  readinessRules: ["readinessRules"] as const,
+  readinessRuleForDate: (date: string) => ["readinessRule", date] as const,
   chessStats: ["chessStats"] as const,
   chessStatsLatest: ["chessStats", "latest"] as const,
+  journalEntries: ["journalEntries"] as const,
+  tradingRules: ["tradingRules"] as const,
   settings: ["settings"] as const,
 };
 
@@ -209,6 +219,82 @@ export function useSaveMentalCheck() {
   });
 }
 
+/* -------------------------- First thoughts --------------------------- */
+
+export function useFirstThoughts() {
+  const repos = useRepositories();
+  return useQuery({ queryKey: queryKeys.firstThoughts, queryFn: () => repos.firstThoughts.list() });
+}
+
+export function useFirstThought(date: string) {
+  const repos = useRepositories();
+  return useQuery({
+    queryKey: queryKeys.firstThought(date),
+    queryFn: () => repos.firstThoughts.getByDate(date),
+  });
+}
+
+export function useSaveFirstThought() {
+  const repos = useRepositories();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: FirstThoughtInput) => repos.firstThoughts.save(input),
+    onSuccess: (check) => {
+      qc.invalidateQueries({ queryKey: queryKeys.firstThoughts });
+      qc.invalidateQueries({ queryKey: queryKeys.firstThought(check.date) });
+    },
+  });
+}
+
+/* -------------------------- Readiness rules -------------------------- */
+
+export function useReadinessRules() {
+  const repos = useRepositories();
+  return useQuery({ queryKey: queryKeys.readinessRules, queryFn: () => repos.readinessRules.list() });
+}
+
+export function useReadinessRuleForDate(date: string | undefined) {
+  const repos = useRepositories();
+  return useQuery({
+    queryKey: queryKeys.readinessRuleForDate(date ?? ""),
+    queryFn: () => repos.readinessRules.findForDate(date as string),
+    enabled: Boolean(date),
+  });
+}
+
+function invalidateReadinessQueries(qc: ReturnType<typeof useQueryClient>) {
+  qc.invalidateQueries({ queryKey: queryKeys.readinessRules });
+  qc.invalidateQueries({ queryKey: ["readinessRule"] });
+}
+
+export function useCreateReadinessRule() {
+  const repos = useRepositories();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: ReadinessRuleInput) => repos.readinessRules.create(input),
+    onSuccess: () => invalidateReadinessQueries(qc),
+  });
+}
+
+export function useUpdateReadinessRule() {
+  const repos = useRepositories();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, patch }: { id: string; patch: Partial<ReadinessRuleInput> }) =>
+      repos.readinessRules.update(id, patch),
+    onSuccess: () => invalidateReadinessQueries(qc),
+  });
+}
+
+export function useDeleteReadinessRule() {
+  const repos = useRepositories();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => repos.readinessRules.delete(id),
+    onSuccess: () => invalidateReadinessQueries(qc),
+  });
+}
+
 /* --------------------------- Chess stats ---------------------------- */
 
 export function useChessStatsList() {
@@ -224,11 +310,11 @@ export function useLatestChessStats() {
   });
 }
 
-export function useChessStatsWeek(weekStart: string) {
+export function useChessStatsDay(date: string) {
   const repos = useRepositories();
   return useQuery({
-    queryKey: ["chessStats", "week", weekStart],
-    queryFn: () => repos.chessStats.getByWeek(weekStart),
+    queryKey: ["chessStats", "day", date],
+    queryFn: () => repos.chessStats.getByDate(date),
   });
 }
 
@@ -238,6 +324,66 @@ export function useSaveChessStats() {
   return useMutation({
     mutationFn: (input: ChessStatsInput) => repos.chessStats.save(input),
     onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.chessStats }),
+  });
+}
+
+/* -------------------------- Journal entries -------------------------- */
+
+export function useJournalEntries() {
+  const repos = useRepositories();
+  return useQuery({ queryKey: queryKeys.journalEntries, queryFn: () => repos.journalEntries.list() });
+}
+
+export function useCreateJournalEntry() {
+  const repos = useRepositories();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: JournalEntryInput) => repos.journalEntries.create(input),
+    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.journalEntries }),
+  });
+}
+
+export function useUpdateJournalEntry() {
+  const repos = useRepositories();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, patch }: { id: string; patch: Partial<JournalEntryInput> }) =>
+      repos.journalEntries.update(id, patch),
+    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.journalEntries }),
+  });
+}
+
+export function useDeleteJournalEntry() {
+  const repos = useRepositories();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => repos.journalEntries.delete(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.journalEntries }),
+  });
+}
+
+/* --------------------------- Trading rules ---------------------------- */
+
+export function useTradingRules() {
+  const repos = useRepositories();
+  return useQuery({ queryKey: queryKeys.tradingRules, queryFn: () => repos.tradingRules.list() });
+}
+
+export function useCreateTradingRule() {
+  const repos = useRepositories();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: TradingRuleInput) => repos.tradingRules.create(input),
+    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.tradingRules }),
+  });
+}
+
+export function useDeleteTradingRule() {
+  const repos = useRepositories();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => repos.tradingRules.delete(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.tradingRules }),
   });
 }
 

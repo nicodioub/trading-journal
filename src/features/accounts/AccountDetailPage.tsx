@@ -113,6 +113,43 @@ export function AccountDetailPage() {
         <StatTile label="Current drawdown" value={formatPercent(summary.currentDrawdownPct, 1)} intent={summary.currentDrawdownPct > 0 ? "negative" : "neutral"} />
       </div>
 
+      {account.targetProfit > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Target profit</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {(() => {
+              const progressPct = Math.max(0, (summary.totalPnl / account.targetProfit) * 100);
+              const reached = summary.totalPnl >= account.targetProfit;
+              return (
+                <div className="space-y-3">
+                  <div className="flex items-baseline justify-between">
+                    <span className="text-2xl font-semibold tabular-nums">
+                      {formatCurrency(summary.totalPnl, currency, { signed: true })}
+                    </span>
+                    <span className="text-sm text-muted-foreground">
+                      of {formatCurrency(account.targetProfit, currency)} target
+                    </span>
+                  </div>
+                  <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
+                    <div
+                      className={`h-full rounded-full transition-all ${reached ? "bg-success" : "bg-primary"}`}
+                      style={{ width: `${Math.min(progressPct, 100)}%` }}
+                    />
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    {reached
+                      ? "Target reached 🎯"
+                      : `${formatPercent(progressPct, 0)} of the way there`}
+                  </p>
+                </div>
+              );
+            })()}
+          </CardContent>
+        </Card>
+      )}
+
       <Card>
         <CardHeader>
           <CardTitle>Account evolution</CardTitle>

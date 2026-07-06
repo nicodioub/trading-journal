@@ -10,10 +10,10 @@ import {
   EmptyState,
   StatTile,
 } from "@/components/ui";
-import { useAccounts, useChessStatsList, useMentalChecks, useTrades } from "@/data";
+import { useAccounts, useChessStatsList, useFirstThoughts, useMentalChecks, useTrades } from "@/data";
 import {
+  buildDailyChessSeries,
   buildDailyPsychologySeries,
-  buildWeeklyChessSeries,
   computeChessCorrelations,
   computePsychologyCorrelations,
   describeCorrelation,
@@ -21,6 +21,7 @@ import {
 import { formatCurrency } from "@/lib/format";
 import { ChessTradingChart } from "./components/ChessTradingChart";
 import { MoodPnlScatter } from "./components/MoodPnlScatter";
+import { PsychInsights } from "./components/PsychInsights";
 
 function formatCorr(r: number | null): string {
   if (r === null) return "—";
@@ -32,6 +33,7 @@ export function MindPage() {
   const { data: chess = [] } = useChessStatsList();
   const { data: trades = [] } = useTrades();
   const { data: accounts = [] } = useAccounts();
+  const { data: firstThoughts = [] } = useFirstThoughts();
   const currency = accounts[0]?.currency ?? "USD";
 
   const psych = useMemo(
@@ -46,12 +48,12 @@ export function MindPage() {
     () => buildDailyPsychologySeries(checks, trades),
     [checks, trades],
   );
-  const weeklyChess = useMemo(
-    () => buildWeeklyChessSeries(chess, trades),
+  const dailyChess = useMemo(
+    () => buildDailyChessSeries(chess, trades),
     [chess, trades],
   );
 
-  const hasAny = psych.sampleSize > 0 || chessCorr.sampleSize > 0;
+  const hasAny = psych.sampleSize > 0 || chessCorr.sampleSize > 0 || firstThoughts.length > 0;
 
   return (
     <div>
@@ -64,10 +66,12 @@ export function MindPage() {
         <EmptyState
           icon={Brain}
           title="Not enough data yet"
-          description="Log your daily check-ins, weekly chess and trades on the same days — once they overlap, the correlations appear here."
+          description="Log your daily check-ins, daily chess rating and trades on the same days — once they overlap, the correlations appear here."
         />
       ) : (
         <div className="space-y-8">
+          <PsychInsights thoughts={firstThoughts} trades={trades} currency={currency} />
+
           {/* Chess ↔ trading */}
           <section className="space-y-4">
             <div className="flex items-center gap-2">
@@ -84,14 +88,14 @@ export function MindPage() {
                 hint={describeCorrelation(chessCorr.chessVsTradingWinRate)}
               />
               <StatTile
-                label="Chess win-rate vs weekly PnL"
+                label="Chess win-rate vs daily PnL"
                 value={formatCorr(chessCorr.chessVsPnl)}
                 hint={describeCorrelation(chessCorr.chessVsPnl)}
               />
               <StatTile
-                label="Weeks tracked"
+                label="Days tracked"
                 value={String(chessCorr.sampleSize)}
-                hint="weeks with chess + trades"
+                hint="days with chess + trades"
               />
             </div>
 
@@ -103,12 +107,12 @@ export function MindPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                {weeklyChess.length >= 2 ? (
-                  <ChessTradingChart data={weeklyChess} />
+                {dailyChess.length >= 2 ? (
+                  <ChessTradingChart data={dailyChess} />
                 ) : (
                   <EmptyState
-                    title="Track for 2+ weeks"
-                    description="Log chess games and trades across at least two weeks to see the trend."
+                    title="Track for 2+ days"
+                    description="Log chess games and trades across at least two days to see the trend."
                   />
                 )}
               </CardContent>

@@ -45,6 +45,8 @@ export function SettingsPage() {
   const [defaultCurrency, setCurrency] = useState("USD");
   const [defaultRiskPercent, setRisk] = useState("1");
   const [theme, setTheme] = useState<Theme>("dark");
+  const [chessComUsername, setChessComUsername] = useState("");
+  const [openaiApiKey, setOpenaiApiKey] = useState("");
 
   const fileRef = useRef<HTMLInputElement>(null);
   const [pendingImport, setPendingImport] = useState<BackupData | null>(null);
@@ -57,6 +59,8 @@ export function SettingsPage() {
       setCurrency(settings.defaultCurrency);
       setRisk(String(settings.defaultRiskPercent));
       setTheme(settings.theme);
+      setChessComUsername(settings.chessComUsername);
+      setOpenaiApiKey(settings.openaiApiKey);
     }
   }, [settings]);
 
@@ -66,6 +70,8 @@ export function SettingsPage() {
       defaultCurrency,
       defaultRiskPercent: Number(defaultRiskPercent) || 0,
       theme,
+      chessComUsername: chessComUsername.trim(),
+      openaiApiKey: openaiApiKey.trim(),
     });
 
   const handleExport = async () => {
@@ -165,6 +171,49 @@ export function SettingsPage() {
           </CardContent>
         </Card>
 
+        <Card>
+          <CardHeader>
+            <CardTitle>Chess.com</CardTitle>
+            <CardDescription>
+              Link your username to sync the day's games onto the cognitive
+              thermometer instead of entering them by hand.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-1.5">
+              <Label htmlFor="set-chesscom">Chess.com username</Label>
+              <Input
+                id="set-chesscom"
+                value={chessComUsername}
+                onChange={(e) => setChessComUsername(e.target.value)}
+                placeholder="e.g. hikaru"
+              />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>OpenAI</CardTitle>
+            <CardDescription>
+              Used to analyze your daily "first thought" check-in on the
+              Dashboard with GPT-4o.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-1.5">
+              <Label htmlFor="set-openai-key">OpenAI API key</Label>
+              <Input
+                id="set-openai-key"
+                type="password"
+                value={openaiApiKey}
+                onChange={(e) => setOpenaiApiKey(e.target.value)}
+                placeholder="sk-..."
+              />
+            </div>
+          </CardContent>
+        </Card>
+
         <div className="flex items-center justify-end gap-3">
           {update.isSuccess && (
             <span className="flex items-center gap-1 text-xs text-success">
@@ -217,7 +266,7 @@ export function SettingsPage() {
             <CardTitle>About</CardTitle>
           </CardHeader>
           <CardContent className="space-y-1 text-sm text-muted-foreground">
-            <p>Trading Journal v0.1.0</p>
+            <p>Henledger v0.1.0</p>
             <p>
               Storage:{" "}
               {isTauri() ? "Local SQLite database (offline)" : "Browser (dev preview)"}

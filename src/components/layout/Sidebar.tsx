@@ -1,10 +1,15 @@
 import {
   BarChart3,
   Brain,
+  CalendarOff,
   History,
   LayoutDashboard,
+  Newspaper,
+  NotebookPen,
   PlusCircle,
+  ScrollText,
   Settings,
+  Target,
   Wallet,
   type LucideIcon,
 } from "lucide-react";
@@ -26,6 +31,11 @@ const NAV_ITEMS: NavItem[] = [
   { to: "/trades", label: "Trade History", icon: History, end: true },
   { to: "/statistics", label: "Statistics", icon: BarChart3 },
   { to: "/mind", label: "Mind", icon: Brain },
+  { to: "/readiness", label: "Readiness", icon: CalendarOff },
+  { to: "/journal", label: "Journal", icon: NotebookPen },
+  { to: "/rules", label: "Rules", icon: ScrollText },
+  { to: "/planning", label: "Planning", icon: Target },
+  { to: "/news", label: "News", icon: Newspaper },
   { to: "/settings", label: "Settings", icon: Settings },
 ];
 
@@ -37,7 +47,7 @@ export function Sidebar() {
           <BarChart3 className="h-5 w-5" />
         </div>
         <div className="leading-tight">
-          <div className="text-sm font-semibold">Trading Journal</div>
+          <div className="text-sm font-semibold">Henledger</div>
           <div className="text-[11px] text-muted-foreground">
             Your trading companion
           </div>

@@ -11,6 +11,10 @@ export const settingsSchema = z.object({
   defaultCurrency: z.string().default("USD"),
   defaultRiskPercent: z.number().nonnegative().default(1),
   theme: themeSchema.default("dark"),
+  /** Chess.com username used to auto-sync the daily cognitive thermometer. */
+  chessComUsername: z.string().default(""),
+  /** OpenAI API key used to analyze the daily first-thought check-in. */
+  openaiApiKey: z.string().default(""),
   updatedAt: timestampSchema,
 });
 export type Settings = z.infer<typeof settingsSchema>;
@@ -21,4 +25,6 @@ export const DEFAULT_SETTINGS: Omit<Settings, "updatedAt"> = {
   defaultCurrency: "USD",
   defaultRiskPercent: 1,
   theme: "dark",
+  chessComUsername: "",
+  openaiApiKey: "",
 };

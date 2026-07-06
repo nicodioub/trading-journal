@@ -2,13 +2,13 @@ import { z } from "zod";
 import { idSchema, timestampSchema } from "./common";
 
 /**
- * Weekly chess performance — the trader's "cognitive thermometer".
+ * Daily chess performance — the trader's "cognitive thermometer".
  * Designed to be correlated with trading performance later.
  */
 export const chessStatsSchema = z.object({
   id: idSchema,
-  /** ISO date of the Monday that starts the tracked week. */
-  weekStart: timestampSchema,
+  /** ISO date (yyyy-MM-dd) this rating belongs to, one per day. */
+  date: timestampSchema,
   gamesPlayed: z.number().int().nonnegative().default(0),
   gamesWon: z.number().int().nonnegative().default(0),
   gamesLost: z.number().int().nonnegative().default(0),

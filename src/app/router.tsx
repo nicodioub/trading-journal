@@ -31,6 +31,21 @@ const StatisticsPage = lazy(() =>
 const MindPage = lazy(() =>
   import("@/features/mind/MindPage").then((m) => ({ default: m.MindPage })),
 );
+const ReadinessPage = lazy(() =>
+  import("@/features/readiness/ReadinessPage").then((m) => ({ default: m.ReadinessPage })),
+);
+const JournalPage = lazy(() =>
+  import("@/features/journal/JournalPage").then((m) => ({ default: m.JournalPage })),
+);
+const RulesPage = lazy(() =>
+  import("@/features/rules/RulesPage").then((m) => ({ default: m.RulesPage })),
+);
+const PlanningPage = lazy(() =>
+  import("@/features/planning/PlanningPage").then((m) => ({ default: m.PlanningPage })),
+);
+const NewsPage = lazy(() =>
+  import("@/features/news/NewsPage").then((m) => ({ default: m.NewsPage })),
+);
 const SettingsPage = lazy(() =>
   import("@/features/settings/SettingsPage").then((m) => ({ default: m.SettingsPage })),
 );
@@ -53,6 +68,11 @@ export const router = createHashRouter([
       { path: "trades/:tradeId/edit", element: <EditTradePage /> },
       { path: "statistics", element: <StatisticsPage /> },
       { path: "mind", element: <MindPage /> },
+      { path: "readiness", element: <ReadinessPage /> },
+      { path: "journal", element: <JournalPage /> },
+      { path: "rules", element: <RulesPage /> },
+      { path: "planning", element: <PlanningPage /> },
+      { path: "news", element: <NewsPage /> },
       { path: "settings", element: <SettingsPage /> },
     ],
   },

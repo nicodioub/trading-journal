@@ -2,11 +2,15 @@ import type { Repositories } from "@/data";
 import type {
   Account,
   ChessStats,
+  FirstThought,
+  JournalEntry,
   MentalCheck,
+  ReadinessRule,
   Settings,
   Trade,
   TradeImage,
   TradeNote,
+  TradingRule,
 } from "@/domain";
 
 /**
@@ -22,7 +26,11 @@ export interface BackupData {
   tradeImages: TradeImage[];
   tradeNotes: TradeNote[];
   mentalChecks: MentalCheck[];
+  firstThoughts: FirstThought[];
+  readinessRules: ReadinessRule[];
   chessStats: ChessStats[];
+  journalEntries: JournalEntry[];
+  tradingRules: TradingRule[];
   settings: Settings;
 }
 
@@ -47,7 +55,11 @@ export async function exportData(repos: Repositories): Promise<BackupData> {
     tradeImages,
     tradeNotes,
     mentalChecks: await repos.mentalChecks.list(),
+    firstThoughts: await repos.firstThoughts.list(),
+    readinessRules: await repos.readinessRules.list(),
     chessStats: await repos.chessStats.list(),
+    journalEntries: await repos.journalEntries.list(),
+    tradingRules: await repos.tradingRules.list(),
     settings: await repos.settings.get(),
   };
 }
@@ -108,6 +120,20 @@ export async function importData(
     await repos.mentalChecks.save(input);
   }
 
+  for (const thought of data.firstThoughts ?? []) {
+    const { id, createdAt, ...input } = thought;
+    void id;
+    void createdAt;
+    await repos.firstThoughts.save(input);
+  }
+
+  for (const rule of data.readinessRules ?? []) {
+    const { id, createdAt, ...input } = rule;
+    void id;
+    void createdAt;
+    await repos.readinessRules.create(input);
+  }
+
   for (const stats of data.chessStats) {
     const { id, createdAt, updatedAt, ...input } = stats;
     void id;
@@ -116,11 +142,28 @@ export async function importData(
     await repos.chessStats.save(input);
   }
 
+  for (const entry of data.journalEntries ?? []) {
+    const { id, createdAt, updatedAt, ...input } = entry;
+    void id;
+    void createdAt;
+    void updatedAt;
+    await repos.journalEntries.create(input);
+  }
+
+  for (const rule of data.tradingRules ?? []) {
+    const { id, createdAt, ...input } = rule;
+    void id;
+    void createdAt;
+    await repos.tradingRules.create(input);
+  }
+
   await repos.settings.update({
     motivationalQuote: data.settings.motivationalQuote,
     defaultCurrency: data.settings.defaultCurrency,
     defaultRiskPercent: data.settings.defaultRiskPercent,
     theme: data.settings.theme,
+    chessComUsername: data.settings.chessComUsername ?? "",
+    openaiApiKey: data.settings.openaiApiKey ?? "",
   });
 }
 
@@ -133,7 +176,7 @@ export function downloadBackup(data: BackupData): void {
   const stamp = new Date().toISOString().slice(0, 10);
   const anchor = document.createElement("a");
   anchor.href = url;
-  anchor.download = `trading-journal-backup-${stamp}.json`;
+  anchor.download = `henledger-backup-${stamp}.json`;
   document.body.appendChild(anchor);
   anchor.click();
   anchor.remove();

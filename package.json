@@ -1,9 +1,9 @@
 {
-  "name": "trading-journal",
+  "name": "henledger",
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "description": "Personal, offline-first trading journal — psychology, discipline, performance.",
+  "description": "Personal, offline-first trading ledger for psychology, discipline, and performance.",
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",

@@ -1,6 +1,6 @@
-# Trading Journal
+# Henledger
 
-A personal, offline-first desktop **trading journal** — built to be a trading
+A personal, offline-first desktop **trading ledger** built to be a trading
 _companion_ focused on psychology, discipline, performance and account tracking.
 
 Not a SaaS. Every install is a private, local app with its own database. It can

@@ -2,7 +2,7 @@ import Database from "@tauri-apps/plugin-sql";
 import { MIGRATIONS } from "./schema";
 
 /** SQLite file lives in the app's data directory, managed by the SQL plugin. */
-const DB_URL = "sqlite:trading-journal.db";
+const DB_URL = "sqlite:henledger.db";
 
 let dbPromise: Promise<Database> | null = null;
 

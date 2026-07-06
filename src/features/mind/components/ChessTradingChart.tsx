@@ -9,15 +9,15 @@ import {
   YAxis,
 } from "recharts";
 import { ChartTooltip, useChartTokens } from "@/components/charts";
-import type { WeeklyChessPoint } from "@/domain";
+import type { DailyChessPoint } from "@/domain";
 import { formatPercent } from "@/lib/format";
 
 /**
- * Chess win-rate vs trading win-rate, week by week. Both are percentages on one
+ * Chess win-rate vs trading win-rate, day by day. Both are percentages on one
  * shared 0–100 axis (never a dual axis). Two categorical series — a blue/amber
  * pair chosen for colorblind separation — each named in the legend.
  */
-export function ChessTradingChart({ data }: { data: WeeklyChessPoint[] }) {
+export function ChessTradingChart({ data }: { data: DailyChessPoint[] }) {
   const c = useChartTokens();
   const series = [
     { key: "chessWinRate", label: "Chess", color: c.primary },
@@ -39,7 +39,7 @@ export function ChessTradingChart({ data }: { data: WeeklyChessPoint[] }) {
           <LineChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: 8 }}>
             <CartesianGrid stroke={c.grid} vertical={false} />
             <XAxis
-              dataKey="weekStart"
+              dataKey="date"
               tickFormatter={(d: string) => format(new Date(d), "dd MMM")}
               tick={{ fill: c.axis, fontSize: 11 }}
               axisLine={false}
@@ -59,7 +59,7 @@ export function ChessTradingChart({ data }: { data: WeeklyChessPoint[] }) {
               content={(props: any) =>
                 props.active && props.payload?.length ? (
                   <ChartTooltip
-                    label={`W/o ${format(new Date(props.label), "dd MMM yyyy")}`}
+                    label={format(new Date(props.label), "dd MMM yyyy")}
                     rows={[
                       { label: "Chess", value: formatPercent(props.payload[0]?.value ?? 0, 0), color: c.primary },
                       { label: "Trading", value: formatPercent(props.payload[1]?.value ?? 0, 0), color: c.warning },

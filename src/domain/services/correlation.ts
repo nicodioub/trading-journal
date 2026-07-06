@@ -1,4 +1,4 @@
-import { format, startOfWeek } from "date-fns";
+import { format } from "date-fns";
 import type { ChessStats, MentalCheck, Trade } from "../models";
 import { chessWinRate } from "./chessStats";
 import { getOutcome } from "./tradeStats";
@@ -13,10 +13,6 @@ import { getOutcome } from "./tradeStats";
 
 function dayKey(iso: string): string {
   return format(new Date(iso), "yyyy-MM-dd");
-}
-
-function weekKey(iso: string): string {
-  return format(startOfWeek(new Date(iso), { weekStartsOn: 1 }), "yyyy-MM-dd");
 }
 
 interface PeriodAgg {
@@ -133,10 +129,10 @@ export function computePsychologyCorrelations(
   };
 }
 
-/* ---------------------------- Chess (weekly) ---------------------------- */
+/* ---------------------------- Chess (daily) ---------------------------- */
 
-export interface WeeklyChessPoint {
-  weekStart: string;
+export interface DailyChessPoint {
+  date: string;
   chessWinRate: number;
   gamesPlayed: number;
   pnl: number;
@@ -144,19 +140,19 @@ export interface WeeklyChessPoint {
   tradingWinRate: number;
 }
 
-/** Weeks that have chess games played AND at least one closed trade. */
-export function buildWeeklyChessSeries(
+/** Days that have chess games played AND at least one closed trade. */
+export function buildDailyChessSeries(
   chessStats: ChessStats[],
   trades: Trade[],
-): WeeklyChessPoint[] {
-  const byWeek = aggregate(trades, weekKey);
+): DailyChessPoint[] {
+  const byDay = aggregate(trades, dayKey);
   return chessStats
     .filter((s) => s.gamesPlayed > 0)
-    .map((s): WeeklyChessPoint | null => {
-      const agg = byWeek.get(s.weekStart);
+    .map((s): DailyChessPoint | null => {
+      const agg = byDay.get(s.date);
       if (!agg || agg.trades === 0) return null;
       return {
-        weekStart: s.weekStart,
+        date: s.date,
         chessWinRate: chessWinRate(s),
         gamesPlayed: s.gamesPlayed,
         pnl: agg.pnl,
@@ -164,8 +160,8 @@ export function buildWeeklyChessSeries(
         tradingWinRate: (agg.wins / agg.trades) * 100,
       };
     })
-    .filter((p): p is WeeklyChessPoint => p !== null)
-    .sort((a, b) => a.weekStart.localeCompare(b.weekStart));
+    .filter((p): p is DailyChessPoint => p !== null)
+    .sort((a, b) => a.date.localeCompare(b.date));
 }
 
 export interface ChessCorrelations {
@@ -178,7 +174,7 @@ export function computeChessCorrelations(
   chessStats: ChessStats[],
   trades: Trade[],
 ): ChessCorrelations {
-  const series = buildWeeklyChessSeries(chessStats, trades);
+  const series = buildDailyChessSeries(chessStats, trades);
   return {
     sampleSize: series.length,
     chessVsTradingWinRate: pearson(series.map((p) => [p.chessWinRate, p.tradingWinRate])),

@@ -1,0 +1,1 @@
+readiness only for today 

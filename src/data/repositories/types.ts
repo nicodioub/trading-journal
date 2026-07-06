@@ -4,14 +4,22 @@ import type {
   ChessStats,
   ChessStatsInput,
   Direction,
+  FirstThought,
+  FirstThoughtInput,
+  JournalEntry,
+  JournalEntryInput,
   MentalCheck,
   MentalCheckInput,
+  ReadinessRule,
+  ReadinessRuleInput,
   Settings,
   Trade,
   TradeImage,
   TradeImageInput,
   TradeInput,
   TradeNote,
+  TradingRule,
+  TradingRuleInput,
 } from "@/domain";
 
 /**
@@ -71,12 +79,42 @@ export interface MentalCheckRepository {
   save(input: MentalCheckInput): Promise<MentalCheck>;
 }
 
+export interface FirstThoughtRepository {
+  list(): Promise<FirstThought[]>;
+  getByDate(date: string): Promise<FirstThought | null>;
+  /** Upsert the check for its calendar day. */
+  save(input: FirstThoughtInput): Promise<FirstThought>;
+}
+
+export interface ReadinessRuleRepository {
+  list(): Promise<ReadinessRule[]>;
+  /** The rule covering a given date, if any (most recently created wins on overlap). */
+  findForDate(date: string): Promise<ReadinessRule | null>;
+  create(input: ReadinessRuleInput): Promise<ReadinessRule>;
+  update(id: string, patch: Partial<ReadinessRuleInput>): Promise<ReadinessRule>;
+  delete(id: string): Promise<void>;
+}
+
 export interface ChessStatsRepository {
   list(): Promise<ChessStats[]>;
-  getByWeek(weekStart: string): Promise<ChessStats | null>;
+  getByDate(date: string): Promise<ChessStats | null>;
   getLatest(): Promise<ChessStats | null>;
-  /** Upsert stats for the week. */
+  /** Upsert stats for the day. */
   save(input: ChessStatsInput): Promise<ChessStats>;
+}
+
+export interface JournalEntryRepository {
+  list(): Promise<JournalEntry[]>;
+  create(input: JournalEntryInput): Promise<JournalEntry>;
+  update(id: string, patch: Partial<JournalEntryInput>): Promise<JournalEntry>;
+  delete(id: string): Promise<void>;
+}
+
+export interface TradingRuleRepository {
+  list(): Promise<TradingRule[]>;
+  create(input: TradingRuleInput): Promise<TradingRule>;
+  update(id: string, patch: Partial<TradingRuleInput>): Promise<TradingRule>;
+  delete(id: string): Promise<void>;
 }
 
 export interface SettingsRepository {
@@ -104,7 +142,11 @@ export interface Repositories {
   tradeImages: TradeImageRepository;
   tradeNotes: TradeNoteRepository;
   mentalChecks: MentalCheckRepository;
+  firstThoughts: FirstThoughtRepository;
+  readinessRules: ReadinessRuleRepository;
   chessStats: ChessStatsRepository;
+  journalEntries: JournalEntryRepository;
+  tradingRules: TradingRuleRepository;
   settings: SettingsRepository;
   images: ImageStorage;
   /** Wipe all data (used by backup-restore and the Settings reset). */

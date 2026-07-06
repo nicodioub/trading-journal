@@ -1,4 +1,4 @@
-import { Brain } from "lucide-react";
+import { Brain, RefreshCw } from "lucide-react";
 import { useEffect, useState } from "react";
 import {
   Button,
@@ -10,21 +10,25 @@ import {
   Input,
   Label,
 } from "@/components/ui";
-import { useChessStatsWeek, useSaveChessStats } from "@/data";
-import { chessWinRate, currentWeekStart } from "@/domain";
+import { useChessStatsDay, useSaveChessStats, useSettings } from "@/data";
+import { chessWinRate, currentChessDay } from "@/domain";
 import { formatPercent } from "@/lib/format";
+import { fetchChessComDailyResult } from "../chessCom";
 
 const DEFAULT = { gamesPlayed: 0, gamesWon: 0, gamesLost: 0 };
 
 /**
- * The "cognitive thermometer" — weekly chess performance, tracked so it can be
+ * The "cognitive thermometer" — today's chess performance, tracked so it can be
  * correlated with trading performance later.
  */
 export function ChessThermometerCard() {
-  const weekStart = currentWeekStart();
-  const { data: existing } = useChessStatsWeek(weekStart);
+  const date = currentChessDay();
+  const { data: existing } = useChessStatsDay(date);
+  const { data: settings } = useSettings();
   const save = useSaveChessStats();
   const [form, setForm] = useState(DEFAULT);
+  const [syncing, setSyncing] = useState(false);
+  const [syncError, setSyncError] = useState<string | null>(null);
 
   useEffect(() => {
     if (existing) {
@@ -40,14 +44,42 @@ export function ChessThermometerCard() {
   const set = (key: keyof typeof form, value: string) =>
     setForm((prev) => ({ ...prev, [key]: Math.max(0, Number(value) || 0) }));
 
+  const handleSync = async () => {
+    if (!settings?.chessComUsername) return;
+    setSyncing(true);
+    setSyncError(null);
+    try {
+      const result = await fetchChessComDailyResult(settings.chessComUsername, date);
+      setForm(result);
+      // Persist immediately — otherwise a synced-but-unsaved result is only in
+      // local state and both disappears on reload and stays invisible to the
+      // First Thought analysis, which reads chess data from the saved table.
+      await save.mutateAsync({ date, ...result });
+    } catch {
+      setSyncError("Couldn't reach Chess.com. Check the username and your connection.");
+    } finally {
+      setSyncing(false);
+    }
+  };
+
   return (
     <Card>
       <CardHeader>
-        <div className="flex items-center gap-2">
-          <Brain className="h-4 w-4 text-primary" />
-          <CardTitle>Cognitive Thermometer</CardTitle>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Brain className="h-4 w-4 text-primary" />
+            <CardTitle>Cognitive Thermometer</CardTitle>
+          </div>
+          {settings?.chessComUsername && (
+            <Button variant="ghost" size="sm" onClick={handleSync} disabled={syncing}>
+              <RefreshCw className={`h-3.5 w-3.5 ${syncing ? "animate-spin" : ""}`} />
+              {syncing ? "Updating…" : "Update chess data"}
+            </Button>
+          )}
         </div>
-        <CardDescription>Your chess week — a proxy for mental sharpness.</CardDescription>
+        <CardDescription>
+          Estimated cognitive sharpness based on today's chess performance.
+        </CardDescription>
       </CardHeader>
       <CardContent className="space-y-5">
         <div className="flex flex-col items-center justify-center rounded-lg border border-border bg-background/40 py-5">
@@ -55,7 +87,7 @@ export function ChessThermometerCard() {
             {formatPercent(winRate, 0)}
           </div>
           <div className="mt-1 text-xs uppercase tracking-wide text-muted-foreground">
-            Win rate this week
+            Win rate today
           </div>
           <div className="mt-3 h-1.5 w-40 overflow-hidden rounded-full bg-muted">
             <div
@@ -98,13 +130,15 @@ export function ChessThermometerCard() {
           </div>
         </div>
 
+        {syncError && <p className="text-xs text-danger">{syncError}</p>}
+
         <div className="flex justify-end">
           <Button
             variant="secondary"
-            onClick={() => save.mutate({ weekStart, ...form })}
+            onClick={() => save.mutate({ date, ...form })}
             disabled={save.isPending}
           >
-            Save week
+            Save today
           </Button>
         </div>
       </CardContent>

@@ -1,21 +1,29 @@
-import { format, startOfWeek } from "date-fns";
+import { format } from "date-fns";
 import {
   accountSchema,
   chessStatsSchema,
   DEFAULT_SETTINGS,
+  firstThoughtSchema,
   getOutcome,
+  journalEntrySchema,
   mentalCheckSchema,
+  readinessRuleSchema,
   settingsSchema,
   tradeImageSchema,
   tradeNoteSchema,
   tradeSchema,
+  tradingRuleSchema,
   type Account,
   type ChessStats,
+  type FirstThought,
+  type JournalEntry,
   type MentalCheck,
+  type ReadinessRule,
   type Settings,
   type Trade,
   type TradeImage,
   type TradeNote,
+  type TradingRule,
 } from "@/domain";
 import { createId } from "@/lib/utils";
 import type {
@@ -39,7 +47,11 @@ interface Snapshot {
   tradeImages: TradeImage[];
   tradeNotes: TradeNote[];
   mentalChecks: MentalCheck[];
+  firstThoughts: FirstThought[];
+  readinessRules: ReadinessRule[];
   chessStats: ChessStats[];
+  journalEntries: JournalEntry[];
+  tradingRules: TradingRule[];
   settings: Settings | null;
 }
 
@@ -53,7 +65,11 @@ class MemoryStore {
   tradeImages: TradeImage[] = [];
   tradeNotes: TradeNote[] = [];
   mentalChecks: MentalCheck[] = [];
+  firstThoughts: FirstThought[] = [];
+  readinessRules: ReadinessRule[] = [];
   chessStats: ChessStats[] = [];
+  journalEntries: JournalEntry[] = [];
+  tradingRules: TradingRule[] = [];
   settings: Settings | null = null;
   images = new Map<string, string>();
 
@@ -67,6 +83,12 @@ class MemoryStore {
       if (!raw) return;
       const snap = JSON.parse(raw) as Snapshot;
       Object.assign(this, snap);
+      // Drop/upgrade first-thought records left over from an earlier schema shape,
+      // applying current defaults (e.g. confidenceScore, reframe, mission) as needed.
+      this.firstThoughts = this.firstThoughts.flatMap((t) => {
+        const parsed = firstThoughtSchema.safeParse(t);
+        return parsed.success ? [parsed.data] : [];
+      });
     } catch {
       // Corrupt/unavailable storage — start clean.
     }
@@ -79,7 +101,11 @@ class MemoryStore {
       tradeImages: this.tradeImages,
       tradeNotes: this.tradeNotes,
       mentalChecks: this.mentalChecks,
+      firstThoughts: this.firstThoughts,
+      readinessRules: this.readinessRules,
       chessStats: this.chessStats,
+      journalEntries: this.journalEntries,
+      tradingRules: this.tradingRules,
       settings: this.settings,
     };
     try {
@@ -263,21 +289,77 @@ export function createMemoryRepositories(): Repositories {
       },
     },
 
-    chessStats: {
+    firstThoughts: {
       async list() {
-        return [...store.chessStats].sort((a, b) => b.weekStart.localeCompare(a.weekStart));
+        return [...store.firstThoughts].sort((a, b) => b.date.localeCompare(a.date));
       },
-      async getByWeek(weekStart) {
-        return store.chessStats.find((s) => s.weekStart === weekStart) ?? null;
-      },
-      async getLatest() {
-        return [...store.chessStats].sort((a, b) => b.weekStart.localeCompare(a.weekStart))[0] ?? null;
+      async getByDate(date) {
+        return store.firstThoughts.find((c) => c.date === date) ?? null;
       },
       async save(input) {
-        const existing = store.chessStats.find((s) => s.weekStart === input.weekStart);
+        const existing = store.firstThoughts.find((c) => c.date === input.date);
+        if (existing) {
+          const merged: FirstThought = { ...existing, ...input };
+          store.firstThoughts = store.firstThoughts.map((c) => (c.date === input.date ? merged : c));
+          store.persist();
+          return merged;
+        }
+        const check = firstThoughtSchema.parse({ ...input, id: createId(), createdAt: nowIso() });
+        store.firstThoughts.push(check);
+        store.persist();
+        return check;
+      },
+    },
+
+    readinessRules: {
+      async list() {
+        return [...store.readinessRules].sort((a, b) => b.startDate.localeCompare(a.startDate));
+      },
+      async findForDate(date) {
+        const matches = store.readinessRules
+          .filter((r) => r.startDate <= date && r.endDate >= date)
+          .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+        return matches[0] ?? null;
+      },
+      async create(input) {
+        const rule = readinessRuleSchema.parse({
+          ...input,
+          id: createId(),
+          createdAt: nowIso(),
+        });
+        store.readinessRules.push(rule);
+        store.persist();
+        return rule;
+      },
+      async update(id, patch) {
+        const existing = store.readinessRules.find((r) => r.id === id);
+        if (!existing) throw new Error(`Readiness rule ${id} not found`);
+        const merged = readinessRuleSchema.parse({ ...existing, ...patch, id });
+        store.readinessRules = store.readinessRules.map((r) => (r.id === id ? merged : r));
+        store.persist();
+        return merged;
+      },
+      async delete(id) {
+        store.readinessRules = store.readinessRules.filter((r) => r.id !== id);
+        store.persist();
+      },
+    },
+
+    chessStats: {
+      async list() {
+        return [...store.chessStats].sort((a, b) => b.date.localeCompare(a.date));
+      },
+      async getByDate(date) {
+        return store.chessStats.find((s) => s.date === date) ?? null;
+      },
+      async getLatest() {
+        return [...store.chessStats].sort((a, b) => b.date.localeCompare(a.date))[0] ?? null;
+      },
+      async save(input) {
+        const existing = store.chessStats.find((s) => s.date === input.date);
         if (existing) {
           const merged: ChessStats = { ...existing, ...input, updatedAt: nowIso() };
-          store.chessStats = store.chessStats.map((s) => (s.weekStart === input.weekStart ? merged : s));
+          store.chessStats = store.chessStats.map((s) => (s.date === input.date ? merged : s));
           store.persist();
           return merged;
         }
@@ -290,6 +372,59 @@ export function createMemoryRepositories(): Repositories {
         store.chessStats.push(stats);
         store.persist();
         return stats;
+      },
+    },
+
+    journalEntries: {
+      async list() {
+        return [...store.journalEntries].sort((a, b) => b.date.localeCompare(a.date) || b.createdAt.localeCompare(a.createdAt));
+      },
+      async create(input) {
+        const entry = journalEntrySchema.parse({
+          ...input,
+          id: createId(),
+          createdAt: nowIso(),
+          updatedAt: nowIso(),
+        });
+        store.journalEntries.push(entry);
+        store.persist();
+        return entry;
+      },
+      async update(id, patch) {
+        const existing = store.journalEntries.find((e) => e.id === id);
+        if (!existing) throw new Error(`Journal entry ${id} not found`);
+        const merged = journalEntrySchema.parse({ ...existing, ...patch, id, updatedAt: nowIso() });
+        store.journalEntries = store.journalEntries.map((e) => (e.id === id ? merged : e));
+        store.persist();
+        return merged;
+      },
+      async delete(id) {
+        store.journalEntries = store.journalEntries.filter((e) => e.id !== id);
+        store.persist();
+      },
+    },
+
+    tradingRules: {
+      async list() {
+        return [...store.tradingRules].sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+      },
+      async create(input) {
+        const rule = tradingRuleSchema.parse({ ...input, id: createId(), createdAt: nowIso() });
+        store.tradingRules.push(rule);
+        store.persist();
+        return rule;
+      },
+      async update(id, patch) {
+        const existing = store.tradingRules.find((r) => r.id === id);
+        if (!existing) throw new Error(`Trading rule ${id} not found`);
+        const merged = tradingRuleSchema.parse({ ...existing, ...patch, id });
+        store.tradingRules = store.tradingRules.map((r) => (r.id === id ? merged : r));
+        store.persist();
+        return merged;
+      },
+      async delete(id) {
+        store.tradingRules = store.tradingRules.filter((r) => r.id !== id);
+        store.persist();
       },
     },
 
@@ -318,7 +453,11 @@ export function createMemoryRepositories(): Repositories {
       store.tradeImages = [];
       store.tradeNotes = [];
       store.mentalChecks = [];
+      store.firstThoughts = [];
+      store.readinessRules = [];
       store.chessStats = [];
+      store.journalEntries = [];
+      store.tradingRules = [];
       store.settings = null;
       store.images.clear();
       store.persist();
@@ -402,16 +541,13 @@ async function seedDemoData(repos: Repositories): Promise<void> {
     });
   }
 
-  // A few weeks of chess to seed the cognitive thermometer.
-  for (let w = 0; w < 5; w += 1) {
-    const weekStart = format(
-      startOfWeek(new Date(now - w * 7 * 86400000), { weekStartsOn: 1 }),
-      "yyyy-MM-dd",
-    );
-    const played = 8 + Math.floor(Math.random() * 12);
+  // A couple weeks of daily chess ratings to seed the cognitive thermometer.
+  for (let d = 0; d < 14; d += 1) {
+    const date = format(new Date(now - d * 86400000), "yyyy-MM-dd");
+    const played = 2 + Math.floor(Math.random() * 6);
     const won = Math.floor(played * (0.4 + Math.random() * 0.4));
     await repos.chessStats.save({
-      weekStart,
+      date,
       gamesPlayed: played,
       gamesWon: won,
       gamesLost: played - won,

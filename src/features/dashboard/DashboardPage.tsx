@@ -2,17 +2,19 @@ import { Flame, Percent, TrendingUp, Wallet } from "lucide-react";
 import { useMemo } from "react";
 import { StatTile } from "@/components/ui";
 import { useAccounts, useSettings, useTrades } from "@/data";
+import { getSessionSplashQuote } from "@/data/splashQuotes";
 import { computePerformanceStats } from "@/domain";
 import { formatCurrency, formatPercent } from "@/lib/format";
 import { AccountBalancesWidget } from "./components/AccountBalancesWidget";
 import { ChessThermometerCard } from "./components/ChessThermometerCard";
-import { MentalCheckCard } from "./components/MentalCheckCard";
+import { FirstThoughtCard } from "./components/FirstThoughtCard";
 import { RecentTradesWidget } from "./components/RecentTradesWidget";
 
 export function DashboardPage() {
   const { data: settings } = useSettings();
   const { data: accounts = [] } = useAccounts();
   const { data: trades = [] } = useTrades();
+  const sessionQuote = useMemo(() => getSessionSplashQuote(), []);
 
   const perf = useMemo(() => computePerformanceStats(trades), [trades]);
 
@@ -28,20 +30,20 @@ export function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      {/* Motivational banner */}
-      <div className="relative overflow-hidden rounded-xl border border-border bg-gradient-to-r from-primary/15 via-surface to-surface px-6 py-5">
-        <p className="text-lg font-medium tracking-tight">
-          {settings?.motivationalQuote ?? "Trade your plan, not your emotions."}
+      {/* Motivational banner — same quote shown on the boot splash */}
+      <div className="px-6 py-2 text-center">
+        <p className="text-lg font-medium italic tracking-tight">
+          &ldquo;{sessionQuote.text}&rdquo;
         </p>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Start with your mental check-in before you trade.
-        </p>
+        {sessionQuote.source && (
+          <p className="mt-1 text-xs text-muted-foreground">— {sessionQuote.source}</p>
+        )}
       </div>
 
       {/* Check-in + cognitive thermometer */}
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="lg:col-span-2">
-          <MentalCheckCard />
+          <FirstThoughtCard />
         </div>
         <ChessThermometerCard />
       </div>

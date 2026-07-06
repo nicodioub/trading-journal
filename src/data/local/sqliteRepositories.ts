@@ -2,31 +2,43 @@ import {
   accountSchema,
   chessStatsSchema,
   DEFAULT_SETTINGS,
+  firstThoughtSchema,
   getOutcome,
+  journalEntrySchema,
   mentalCheckSchema,
+  readinessRuleSchema,
   settingsSchema,
   tradeImageSchema,
   tradeNoteSchema,
   tradeSchema,
+  tradingRuleSchema,
   type Account,
   type ChessStats,
+  type FirstThought,
+  type JournalEntry,
   type MentalCheck,
+  type ReadinessRule,
   type Settings,
   type Trade,
   type TradeImage,
   type TradeNote,
+  type TradingRule,
 } from "@/domain";
 import { createId } from "@/lib/utils";
 import type {
   AccountRepository,
   ChessStatsRepository,
+  FirstThoughtRepository,
+  JournalEntryRepository,
   MentalCheckRepository,
+  ReadinessRuleRepository,
   Repositories,
   SettingsRepository,
   TradeFilters,
   TradeImageRepository,
   TradeNoteRepository,
   TradeRepository,
+  TradingRuleRepository,
 } from "../repositories";
 import { getDb } from "./db";
 import { tauriImageStorage } from "./imageStorage";
@@ -514,12 +526,237 @@ const mentalCheckRepository: MentalCheckRepository = {
 };
 
 /* ------------------------------------------------------------------ *
+ * First thoughts (one per day)
+ * ------------------------------------------------------------------ */
+
+interface FirstThoughtRow {
+  id: string;
+  date: string;
+  thought: string;
+  job_statement: string;
+  dimensions: string;
+  readiness_score: number;
+  status: string;
+  alignment_score: number;
+  confidence_score: number;
+  primary_focus: string;
+  explanation: string;
+  biases: string;
+  strengths: string;
+  likely_behaviors: string;
+  reframe: string;
+  mission: string;
+  suggested_action: string;
+  ai_observations: string;
+  chess_context: string;
+  created_at: string;
+}
+
+function rowToFirstThought(row: FirstThoughtRow): FirstThought {
+  return firstThoughtSchema.parse({
+    id: row.id,
+    date: row.date,
+    thought: row.thought,
+    jobStatement: row.job_statement,
+    dimensions: JSON.parse(row.dimensions),
+    readinessScore: row.readiness_score,
+    status: row.status,
+    alignmentScore: row.alignment_score,
+    confidenceScore: row.confidence_score,
+    primaryFocus: row.primary_focus,
+    explanation: row.explanation,
+    biases: JSON.parse(row.biases),
+    strengths: JSON.parse(row.strengths),
+    likelyBehaviors: JSON.parse(row.likely_behaviors),
+    reframe: row.reframe,
+    mission: row.mission,
+    suggestedAction: row.suggested_action,
+    aiObservations: row.ai_observations,
+    chessContext: JSON.parse(row.chess_context),
+    createdAt: row.created_at,
+  });
+}
+
+const firstThoughtRepository: FirstThoughtRepository = {
+  async list() {
+    const db = await getDb();
+    const rows = await db.select<FirstThoughtRow[]>(
+      "SELECT * FROM first_thoughts ORDER BY date DESC",
+    );
+    return rows.map(rowToFirstThought);
+  },
+
+  async getByDate(date) {
+    const db = await getDb();
+    const rows = await db.select<FirstThoughtRow[]>(
+      "SELECT * FROM first_thoughts WHERE date = $1",
+      [date],
+    );
+    return rows[0] ? rowToFirstThought(rows[0]) : null;
+  },
+
+  async save(input) {
+    const db = await getDb();
+    const existing = await this.getByDate(input.date);
+    const dimensionsJson = JSON.stringify(input.dimensions);
+    const biasesJson = JSON.stringify(input.biases ?? []);
+    const strengthsJson = JSON.stringify(input.strengths ?? []);
+    const likelyBehaviorsJson = JSON.stringify(input.likelyBehaviors ?? []);
+    const chessContextJson = JSON.stringify(input.chessContext ?? null);
+    if (existing) {
+      await db.execute(
+        `UPDATE first_thoughts SET thought=$2, job_statement=$3, dimensions=$4,
+          readiness_score=$5, status=$6, alignment_score=$7, confidence_score=$8, primary_focus=$9,
+          explanation=$10, biases=$11, strengths=$12, likely_behaviors=$13, reframe=$14, mission=$15,
+          suggested_action=$16, ai_observations=$17, chess_context=$18
+          WHERE date=$1`,
+        [
+          input.date,
+          input.thought,
+          input.jobStatement,
+          dimensionsJson,
+          input.readinessScore,
+          input.status,
+          input.alignmentScore,
+          input.confidenceScore,
+          input.primaryFocus ?? "",
+          input.explanation ?? "",
+          biasesJson,
+          strengthsJson,
+          likelyBehaviorsJson,
+          input.reframe ?? "",
+          input.mission ?? "",
+          input.suggestedAction ?? "",
+          input.aiObservations ?? "",
+          chessContextJson,
+        ],
+      );
+      return { ...existing, ...input };
+    }
+    const check = firstThoughtSchema.parse({
+      ...input,
+      id: createId(),
+      createdAt: nowIso(),
+    });
+    await db.execute(
+      `INSERT INTO first_thoughts
+        (id, date, thought, job_statement, dimensions, readiness_score, status, alignment_score,
+         confidence_score, primary_focus, explanation, biases, strengths, likely_behaviors, reframe,
+         mission, suggested_action, ai_observations, chess_context, created_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)`,
+      [
+        check.id,
+        check.date,
+        check.thought,
+        check.jobStatement,
+        JSON.stringify(check.dimensions),
+        check.readinessScore,
+        check.status,
+        check.alignmentScore,
+        check.confidenceScore,
+        check.primaryFocus,
+        check.explanation,
+        JSON.stringify(check.biases),
+        JSON.stringify(check.strengths),
+        JSON.stringify(check.likelyBehaviors),
+        check.reframe,
+        check.mission,
+        check.suggestedAction,
+        check.aiObservations,
+        JSON.stringify(check.chessContext),
+        check.createdAt,
+      ],
+    );
+    return check;
+  },
+};
+
+/* ------------------------------------------------------------------ *
+ * Readiness rules (trade / no-trade date windows)
+ * ------------------------------------------------------------------ */
+
+interface ReadinessRuleRow {
+  id: string;
+  start_date: string;
+  end_date: string;
+  status: string;
+  reason: string;
+  created_at: string;
+}
+
+function rowToReadinessRule(row: ReadinessRuleRow): ReadinessRule {
+  return readinessRuleSchema.parse({
+    id: row.id,
+    startDate: row.start_date,
+    endDate: row.end_date,
+    status: row.status,
+    reason: row.reason,
+    createdAt: row.created_at,
+  });
+}
+
+const readinessRuleRepository: ReadinessRuleRepository = {
+  async list() {
+    const db = await getDb();
+    const rows = await db.select<ReadinessRuleRow[]>(
+      "SELECT * FROM readiness_rules ORDER BY start_date DESC",
+    );
+    return rows.map(rowToReadinessRule);
+  },
+
+  async findForDate(date) {
+    const db = await getDb();
+    const rows = await db.select<ReadinessRuleRow[]>(
+      `SELECT * FROM readiness_rules WHERE start_date <= $1 AND end_date >= $1
+       ORDER BY created_at DESC LIMIT 1`,
+      [date],
+    );
+    return rows[0] ? rowToReadinessRule(rows[0]) : null;
+  },
+
+  async create(input) {
+    const db = await getDb();
+    const rule = readinessRuleSchema.parse({
+      ...input,
+      id: createId(),
+      createdAt: nowIso(),
+    });
+    await db.execute(
+      `INSERT INTO readiness_rules (id, start_date, end_date, status, reason, created_at)
+       VALUES ($1,$2,$3,$4,$5,$6)`,
+      [rule.id, rule.startDate, rule.endDate, rule.status, rule.reason, rule.createdAt],
+    );
+    return rule;
+  },
+
+  async update(id, patch) {
+    const db = await getDb();
+    const rows = await db.select<ReadinessRuleRow[]>(
+      "SELECT * FROM readiness_rules WHERE id = $1",
+      [id],
+    );
+    if (!rows[0]) throw new Error(`Readiness rule ${id} not found`);
+    const merged = readinessRuleSchema.parse({ ...rowToReadinessRule(rows[0]), ...patch, id });
+    await db.execute(
+      `UPDATE readiness_rules SET start_date=$2, end_date=$3, status=$4, reason=$5 WHERE id=$1`,
+      [merged.id, merged.startDate, merged.endDate, merged.status, merged.reason],
+    );
+    return merged;
+  },
+
+  async delete(id) {
+    const db = await getDb();
+    await db.execute("DELETE FROM readiness_rules WHERE id = $1", [id]);
+  },
+};
+
+/* ------------------------------------------------------------------ *
  * Chess stats (one per week)
  * ------------------------------------------------------------------ */
 
 interface ChessStatsRow {
   id: string;
-  week_start: string;
+  date: string;
   games_played: number;
   games_won: number;
   games_lost: number;
@@ -530,7 +767,7 @@ interface ChessStatsRow {
 function rowToChessStats(row: ChessStatsRow): ChessStats {
   return chessStatsSchema.parse({
     id: row.id,
-    weekStart: row.week_start,
+    date: row.date,
     gamesPlayed: row.games_played,
     gamesWon: row.games_won,
     gamesLost: row.games_lost,
@@ -543,16 +780,16 @@ const chessStatsRepository: ChessStatsRepository = {
   async list() {
     const db = await getDb();
     const rows = await db.select<ChessStatsRow[]>(
-      "SELECT * FROM chess_stats ORDER BY week_start DESC",
+      "SELECT * FROM chess_stats ORDER BY date DESC",
     );
     return rows.map(rowToChessStats);
   },
 
-  async getByWeek(weekStart) {
+  async getByDate(date) {
     const db = await getDb();
     const rows = await db.select<ChessStatsRow[]>(
-      "SELECT * FROM chess_stats WHERE week_start = $1",
-      [weekStart],
+      "SELECT * FROM chess_stats WHERE date = $1",
+      [date],
     );
     return rows[0] ? rowToChessStats(rows[0]) : null;
   },
@@ -560,20 +797,20 @@ const chessStatsRepository: ChessStatsRepository = {
   async getLatest() {
     const db = await getDb();
     const rows = await db.select<ChessStatsRow[]>(
-      "SELECT * FROM chess_stats ORDER BY week_start DESC LIMIT 1",
+      "SELECT * FROM chess_stats ORDER BY date DESC LIMIT 1",
     );
     return rows[0] ? rowToChessStats(rows[0]) : null;
   },
 
   async save(input) {
     const db = await getDb();
-    const existing = await this.getByWeek(input.weekStart);
+    const existing = await this.getByDate(input.date);
     if (existing) {
       const updatedAt = nowIso();
       await db.execute(
         `UPDATE chess_stats SET games_played=$2, games_won=$3, games_lost=$4, updated_at=$5
-         WHERE week_start=$1`,
-        [input.weekStart, input.gamesPlayed, input.gamesWon, input.gamesLost, updatedAt],
+         WHERE date=$1`,
+        [input.date, input.gamesPlayed, input.gamesWon, input.gamesLost, updatedAt],
       );
       return { ...existing, ...input, updatedAt };
     }
@@ -584,11 +821,142 @@ const chessStatsRepository: ChessStatsRepository = {
       updatedAt: nowIso(),
     });
     await db.execute(
-      `INSERT INTO chess_stats (id, week_start, games_played, games_won, games_lost, created_at, updated_at)
+      `INSERT INTO chess_stats (id, date, games_played, games_won, games_lost, created_at, updated_at)
        VALUES ($1,$2,$3,$4,$5,$6,$7)`,
-      [stats.id, stats.weekStart, stats.gamesPlayed, stats.gamesWon, stats.gamesLost, stats.createdAt, stats.updatedAt],
+      [stats.id, stats.date, stats.gamesPlayed, stats.gamesWon, stats.gamesLost, stats.createdAt, stats.updatedAt],
     );
     return stats;
+  },
+};
+
+/* ------------------------------------------------------------------ *
+ * Journal entries (free-form)
+ * ------------------------------------------------------------------ */
+
+interface JournalEntryRow {
+  id: string;
+  date: string;
+  content: string;
+  created_at: string;
+  updated_at: string;
+}
+
+function rowToJournalEntry(row: JournalEntryRow): JournalEntry {
+  return journalEntrySchema.parse({
+    id: row.id,
+    date: row.date,
+    content: row.content,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  });
+}
+
+const journalEntryRepository: JournalEntryRepository = {
+  async list() {
+    const db = await getDb();
+    const rows = await db.select<JournalEntryRow[]>(
+      "SELECT * FROM journal_entries ORDER BY date DESC, created_at DESC",
+    );
+    return rows.map(rowToJournalEntry);
+  },
+
+  async create(input) {
+    const db = await getDb();
+    const entry = journalEntrySchema.parse({
+      ...input,
+      id: createId(),
+      createdAt: nowIso(),
+      updatedAt: nowIso(),
+    });
+    await db.execute(
+      `INSERT INTO journal_entries (id, date, content, created_at, updated_at)
+       VALUES ($1,$2,$3,$4,$5)`,
+      [entry.id, entry.date, entry.content, entry.createdAt, entry.updatedAt],
+    );
+    return entry;
+  },
+
+  async update(id, patch) {
+    const db = await getDb();
+    const rows = await db.select<JournalEntryRow[]>(
+      "SELECT * FROM journal_entries WHERE id = $1",
+      [id],
+    );
+    if (!rows[0]) throw new Error(`Journal entry ${id} not found`);
+    const merged = journalEntrySchema.parse({
+      ...rowToJournalEntry(rows[0]),
+      ...patch,
+      updatedAt: nowIso(),
+    });
+    await db.execute(
+      `UPDATE journal_entries SET date=$2, content=$3, updated_at=$4 WHERE id=$1`,
+      [merged.id, merged.date, merged.content, merged.updatedAt],
+    );
+    return merged;
+  },
+
+  async delete(id) {
+    const db = await getDb();
+    await db.execute("DELETE FROM journal_entries WHERE id = $1", [id]);
+  },
+};
+
+/* ------------------------------------------------------------------ *
+ * Trading rules
+ * ------------------------------------------------------------------ */
+
+interface TradingRuleRow {
+  id: string;
+  content: string;
+  created_at: string;
+}
+
+function rowToTradingRule(row: TradingRuleRow): TradingRule {
+  return tradingRuleSchema.parse({
+    id: row.id,
+    content: row.content,
+    createdAt: row.created_at,
+  });
+}
+
+const tradingRuleRepository: TradingRuleRepository = {
+  async list() {
+    const db = await getDb();
+    const rows = await db.select<TradingRuleRow[]>(
+      "SELECT * FROM trading_rules ORDER BY created_at ASC",
+    );
+    return rows.map(rowToTradingRule);
+  },
+
+  async create(input) {
+    const db = await getDb();
+    const rule = tradingRuleSchema.parse({
+      ...input,
+      id: createId(),
+      createdAt: nowIso(),
+    });
+    await db.execute(
+      `INSERT INTO trading_rules (id, content, created_at) VALUES ($1,$2,$3)`,
+      [rule.id, rule.content, rule.createdAt],
+    );
+    return rule;
+  },
+
+  async update(id, patch) {
+    const db = await getDb();
+    const rows = await db.select<TradingRuleRow[]>(
+      "SELECT * FROM trading_rules WHERE id = $1",
+      [id],
+    );
+    if (!rows[0]) throw new Error(`Trading rule ${id} not found`);
+    const merged = tradingRuleSchema.parse({ ...rowToTradingRule(rows[0]), ...patch });
+    await db.execute(`UPDATE trading_rules SET content=$2 WHERE id=$1`, [merged.id, merged.content]);
+    return merged;
+  },
+
+  async delete(id) {
+    const db = await getDb();
+    await db.execute("DELETE FROM trading_rules WHERE id = $1", [id]);
   },
 };
 
@@ -602,6 +970,8 @@ interface SettingsRow {
   default_currency: string;
   default_risk_percent: number;
   theme: string;
+  chess_com_username: string;
+  openai_api_key: string;
   updated_at: string;
 }
 
@@ -612,6 +982,8 @@ function rowToSettings(row: SettingsRow): Settings {
     defaultCurrency: row.default_currency,
     defaultRiskPercent: row.default_risk_percent,
     theme: row.theme,
+    chessComUsername: row.chess_com_username,
+    openaiApiKey: row.openai_api_key,
     updatedAt: row.updated_at,
   });
 }
@@ -627,9 +999,9 @@ const settingsRepository: SettingsRepository = {
     // Seed defaults on first access.
     const seeded = settingsSchema.parse({ ...DEFAULT_SETTINGS, updatedAt: nowIso() });
     await db.execute(
-      `INSERT INTO settings (id, motivational_quote, default_currency, default_risk_percent, theme, updated_at)
-       VALUES ($1,$2,$3,$4,$5,$6)`,
-      [seeded.id, seeded.motivationalQuote, seeded.defaultCurrency, seeded.defaultRiskPercent, seeded.theme, seeded.updatedAt],
+      `INSERT INTO settings (id, motivational_quote, default_currency, default_risk_percent, theme, chess_com_username, openai_api_key, updated_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
+      [seeded.id, seeded.motivationalQuote, seeded.defaultCurrency, seeded.defaultRiskPercent, seeded.theme, seeded.chessComUsername, seeded.openaiApiKey, seeded.updatedAt],
     );
     return seeded;
   },
@@ -639,9 +1011,9 @@ const settingsRepository: SettingsRepository = {
     const merged = settingsSchema.parse({ ...current, ...patch, id: "default", updatedAt: nowIso() });
     const db = await getDb();
     await db.execute(
-      `UPDATE settings SET motivational_quote=$2, default_currency=$3, default_risk_percent=$4, theme=$5, updated_at=$6
+      `UPDATE settings SET motivational_quote=$2, default_currency=$3, default_risk_percent=$4, theme=$5, chess_com_username=$6, openai_api_key=$7, updated_at=$8
        WHERE id=$1`,
-      ["default", merged.motivationalQuote, merged.defaultCurrency, merged.defaultRiskPercent, merged.theme, merged.updatedAt],
+      ["default", merged.motivationalQuote, merged.defaultCurrency, merged.defaultRiskPercent, merged.theme, merged.chessComUsername, merged.openaiApiKey, merged.updatedAt],
     );
     return merged;
   },
@@ -656,7 +1028,11 @@ async function resetDatabase(): Promise<void> {
     "trades",
     "accounts",
     "mental_checks",
+    "first_thoughts",
+    "readiness_rules",
     "chess_stats",
+    "journal_entries",
+    "trading_rules",
     "settings",
   ]) {
     await db.execute(`DELETE FROM ${table}`);
@@ -671,7 +1047,11 @@ export function createSqliteRepositories(): Repositories {
     tradeImages: tradeImageRepository,
     tradeNotes: tradeNoteRepository,
     mentalChecks: mentalCheckRepository,
+    firstThoughts: firstThoughtRepository,
+    readinessRules: readinessRuleRepository,
     chessStats: chessStatsRepository,
+    journalEntries: journalEntryRepository,
+    tradingRules: tradingRuleRepository,
     settings: settingsRepository,
     images: tauriImageStorage,
     reset: resetDatabase,

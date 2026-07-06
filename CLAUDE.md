@@ -4,7 +4,7 @@ Guidance for working in this repo.
 
 ## What this is
 
-Offline-first **Tauri v2 + React/TS** desktop trading journal. Single-user,
+Offline-first **Tauri v2 + React/TS** desktop trading ledger. Single-user,
 local SQLite. Architected so it can go online later without a rewrite.
 
 ## Commands
@@ -45,7 +45,7 @@ local SQLite. Architected so it can go online later without a rewrite.
 
 ## Tauri specifics
 
-- SQLite DB: `sqlite:trading-journal.db` (app data dir). Schema/migrations in
+- SQLite DB: `sqlite:henledger.db` (app data dir). Schema/migrations in
   `src/data/local/schema.ts`, runner in `db.ts`.
 - Screenshots are files under `<AppLocalData>/images`; displayed via
   `convertFileSrc` (asset protocol, scoped in `tauri.conf.json`).

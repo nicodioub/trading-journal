@@ -113,4 +113,70 @@ export const MIGRATIONS: Migration[] = [
       );`,
     ],
   },
+  {
+    version: 2,
+    statements: [
+      `CREATE TABLE IF NOT EXISTS readiness_rules (
+        id TEXT PRIMARY KEY,
+        start_date TEXT NOT NULL,
+        end_date TEXT NOT NULL,
+        status TEXT NOT NULL,
+        reason TEXT NOT NULL DEFAULT '',
+        created_at TEXT NOT NULL
+      );`,
+      `CREATE INDEX IF NOT EXISTS idx_readiness_rules_range ON readiness_rules(start_date, end_date);`,
+    ],
+  },
+  {
+    version: 3,
+    statements: [
+      `ALTER TABLE chess_stats RENAME COLUMN week_start TO date;`,
+
+      `CREATE TABLE IF NOT EXISTS journal_entries (
+        id TEXT PRIMARY KEY,
+        date TEXT NOT NULL,
+        content TEXT NOT NULL DEFAULT '',
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );`,
+      `CREATE INDEX IF NOT EXISTS idx_journal_entries_date ON journal_entries(date);`,
+
+      `CREATE TABLE IF NOT EXISTS trading_rules (
+        id TEXT PRIMARY KEY,
+        content TEXT NOT NULL,
+        created_at TEXT NOT NULL
+      );`,
+
+      `ALTER TABLE settings ADD COLUMN chess_com_username TEXT NOT NULL DEFAULT '';`,
+    ],
+  },
+  {
+    version: 4,
+    statements: [
+      `ALTER TABLE settings ADD COLUMN openai_api_key TEXT NOT NULL DEFAULT '';`,
+
+      `CREATE TABLE IF NOT EXISTS first_thoughts (
+        id TEXT PRIMARY KEY,
+        date TEXT NOT NULL UNIQUE,
+        thought TEXT NOT NULL,
+        job_statement TEXT NOT NULL DEFAULT '',
+        dimensions TEXT NOT NULL,
+        readiness_score REAL NOT NULL,
+        status TEXT NOT NULL,
+        alignment_score REAL NOT NULL DEFAULT 100,
+        confidence_score REAL NOT NULL DEFAULT 100,
+        primary_focus TEXT NOT NULL DEFAULT '',
+        explanation TEXT NOT NULL DEFAULT '',
+        biases TEXT NOT NULL DEFAULT '[]',
+        strengths TEXT NOT NULL DEFAULT '[]',
+        likely_behaviors TEXT NOT NULL DEFAULT '[]',
+        reframe TEXT NOT NULL DEFAULT '',
+        mission TEXT NOT NULL DEFAULT '',
+        suggested_action TEXT NOT NULL DEFAULT '',
+        ai_observations TEXT NOT NULL DEFAULT '',
+        chess_context TEXT NOT NULL DEFAULT 'null',
+        created_at TEXT NOT NULL
+      );`,
+    ],
+  },
 ];
