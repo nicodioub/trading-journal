@@ -59,6 +59,8 @@ Sometimes you will also receive "Today's mental check" (self-rated mood/confiden
 
 You will also sometimes receive a "7-Day Behavioral History" (a day-by-day log of the trader's readiness status, what they wrote, and whether they actually traded) and a "Behavioral Context" summary (deterministic counts: rule violations, consecutive violations, days since the last rule break, followed-plan rate, a Trust Score, a Consistency Score, discipline/emotional trend, and a classified behavior pattern). When this history is present, you are not just a journal answering "how is the trader doing today" — you are a behavioral coach answering "what is the trader's trajectory, and is today's stated mindset consistent with what they have actually been doing." Do not analyze today in isolation. Compare today's mindset with the trailing days, and detect recurring patterns, repeated rule violations, improvements or declines in discipline, contradictions between stated intentions and actions, and trends in emotional regulation. If the trader has repeatedly ignored their own readiness assessment, treat that as more significant than how today's writing sounds — a calm, disciplined-sounding check-in on the fourth consecutive day of trading through a "no trade" signal is not evidence of discipline, it is evidence that the writing and the behavior have decoupled. Name the pattern explicitly and specifically (e.g. "For the third time in four days, you identified yourself as unfit to trade, yet still entered the market") rather than describing today generically. Watch especially for words-vs-actions contradictions: when a day's history shows the first trade was entered only minutes after a check-in that preached patience or caution, name that divergence directly — stated intention and observed behavior are decoupling, and until they align, confidence stays fragile. Write this longitudinal read in a separate "behavioralAssessment" field (2-4 sentences, coaching register, not clinical) — reference the specific days/counts from the Behavioral Context where relevant. Leave behavioralAssessment as an empty string if no behavioral history was provided.
 
+When behavioral history is present, also distill a "biggestConcern": exactly ONE sentence naming the single most important behavioral truth of the week — the one thing that, if the trader read nothing else, would matter most. It should cut to the underlying dynamic, not restate a statistic. When the pattern is that the trader keeps correctly flagging bad days but trades anyway, the concern is not the market — it is self-obedience; say so in those terms (e.g. "You are no longer struggling to identify when not to trade — you are struggling to obey yourself."). Do not soften it into a stat like "three rule violations this week"; name what it means. Leave biggestConcern as an empty string if no behavioral history was provided.
+
 Also write a "primaryFocus": exactly one sentence naming the single most salient thing for today, prefixed with either "Primary risk today:" or "Primary opportunity today:" depending on which is more relevant. Example: "Primary risk today: Becoming complacent after early profits." or "Primary opportunity today: Your mindset appears well aligned with disciplined execution."
 
 Also list "strengths": an array of short, evidence-based positive observations, grounded in the trader's own wording, not generic praise. Example: ["Low emotional activation", "Strong acceptance of uncertainty", "Clear process orientation"]. Only include strengths you have real evidence for — an empty array is fine if none stand out.
@@ -88,6 +90,7 @@ Respond with ONLY a JSON object, no markdown, no commentary, in this exact shape
   "explanation": "<2-4 sentence mechanism-based explanation, quoting the trader's wording where possible>",
   "aiObservations": "<combined read on writing + chess baseline, or empty string if no chess data>",
   "behavioralAssessment": "<longitudinal coaching read on the 7-day behavioral history, or empty string if none was provided>",
+  "biggestConcern": "<one-sentence distilled behavioral truth of the week, or empty string if no behavioral history>",
   "strengths": ["<evidence-based positive observation>"],
   "likelyBehaviors": ["<concrete behavior this mindset is likely to produce today>"],
   "reframe": "<professional reframing of the raw first thought>",
@@ -104,6 +107,7 @@ export interface FirstThoughtAnalysis {
   explanation: string;
   aiObservations: string;
   behavioralAssessment: string;
+  biggestConcern: string;
   strengths: string[];
   likelyBehaviors: string[];
   reframe: string;
@@ -187,8 +191,12 @@ function describeBehaviorWindow(window: DayBehavior[] | null): string | null {
 
 function describeBehavioralContext(ctx: BehavioralContext | null): string | null {
   if (!ctx) return null;
-  return [
-    `Trust Score: ${ctx.trustScore}/100`,
+  const parts = [
+    `Self-Trust Score: ${ctx.trustScore}/100 (${ctx.trustDelta >= 0 ? "+" : ""}${ctx.trustDelta} this window)`,
+  ];
+  if (ctx.trustBuilders.length) parts.push(`Trust built by: ${ctx.trustBuilders.join("; ")}`);
+  if (ctx.trustDestroyers.length) parts.push(`Trust destroyed by: ${ctx.trustDestroyers.join("; ")}`);
+  parts.push(
     `Consistency Score: ${ctx.consistencyScore}/100`,
     `Discipline trend: ${ctx.disciplineTrend}`,
     `Emotional momentum: ${ctx.emotionalMomentum > 0 ? "+" : ""}${ctx.emotionalMomentum} (positive = activation rising)`,
@@ -201,7 +209,9 @@ function describeBehavioralContext(ctx: BehavioralContext | null): string | null
     `Average readiness this window: ${ctx.averageReadiness ?? "n/a"}`,
     `Average psychological load this window: ${ctx.averagePsychologicalLoad ?? "n/a"}`,
     `Classified current pattern: ${ctx.currentBehaviorPattern}`,
-  ].join("\n");
+    `Identity trajectory: ${ctx.trajectory}`,
+  );
+  return parts.join("\n");
 }
 
 function describeMentalCheck(check: MentalCheck | null): string | null {
@@ -301,6 +311,7 @@ export async function analyzeFirstThought(
     explanation?: unknown;
     aiObservations?: unknown;
     behavioralAssessment?: unknown;
+    biggestConcern?: unknown;
     strengths?: unknown;
     likelyBehaviors?: unknown;
     reframe?: unknown;
@@ -327,6 +338,7 @@ export async function analyzeFirstThought(
     explanation: typeof parsed.explanation === "string" ? parsed.explanation : "",
     aiObservations: typeof parsed.aiObservations === "string" ? parsed.aiObservations : "",
     behavioralAssessment: typeof parsed.behavioralAssessment === "string" ? parsed.behavioralAssessment : "",
+    biggestConcern: typeof parsed.biggestConcern === "string" ? parsed.biggestConcern : "",
     strengths: stringArray(parsed.strengths),
     likelyBehaviors: stringArray(parsed.likelyBehaviors),
     reframe: typeof parsed.reframe === "string" ? parsed.reframe : "",

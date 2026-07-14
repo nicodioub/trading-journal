@@ -1,5 +1,5 @@
 import { Minus, TrendingDown, TrendingUp } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
   Button,
   Card,
@@ -21,7 +21,7 @@ import {
   useSettings,
   useTrades,
 } from "@/data";
-import type { BehaviorPattern, FirstThoughtStatus, PsychDimensions } from "@/domain";
+import type { BehaviorPattern, DayBehavior, FirstThoughtStatus, PsychDimensions, TrajectoryState } from "@/domain";
 import {
   applyChessAdjustment,
   buildBehaviorWindow,
@@ -79,6 +79,13 @@ const BEHAVIOR_PATTERN_TONE: Record<BehaviorPattern, string> = {
   Fearful: "border-danger/30 bg-danger/5 text-danger/90",
   "Forcing Trades": "border-danger/40 bg-danger/10 text-danger",
   "Revenge Trading": "border-danger/50 bg-danger/10 text-danger",
+};
+
+const TRAJECTORY_META: Record<TrajectoryState, { emoji: string; tone: string }> = {
+  "Identity Stable": { emoji: "🟢", tone: "border-success/40 bg-success/10 text-success" },
+  "Rebuilding Discipline": { emoji: "🟡", tone: "border-warning/40 bg-warning/10 text-warning" },
+  "Losing Consistency": { emoji: "🟠", tone: "border-danger/30 bg-danger/5 text-danger/90" },
+  "Breaking Self Trust": { emoji: "🔴", tone: "border-danger/50 bg-danger/10 text-danger" },
 };
 
 const DIMENSION_META: Array<{ key: keyof PsychDimensions; label: string }> = [
@@ -144,6 +151,66 @@ function StatChip({ label, value }: { label: string; value: string }) {
   );
 }
 
+/** The "↓ −18 this week" self-trust movement indicator. */
+function TrustDelta({ delta }: { delta: number }) {
+  if (delta === 0) {
+    return <span className="text-xs text-muted-foreground">no change this week</span>;
+  }
+  const up = delta > 0;
+  const Icon = up ? TrendingUp : TrendingDown;
+  return (
+    <span className={`flex items-center gap-1 text-xs font-semibold ${up ? "text-success" : "text-danger"}`}>
+      <Icon className="h-3.5 w-3.5" />
+      {up ? "+" : ""}
+      {delta} this week
+    </span>
+  );
+}
+
+function EvidenceRow({
+  when,
+  status,
+  outcome,
+  flagged,
+}: {
+  when: string;
+  status: string | null;
+  outcome: string;
+  flagged: boolean;
+}) {
+  return (
+    <div className="flex items-start justify-between gap-3 py-2 text-sm">
+      <div className="min-w-0">
+        <div className="font-medium text-foreground">{when}</div>
+        {status && <div className="text-xs text-muted-foreground">Status: {status}</div>}
+      </div>
+      <div className={`shrink-0 text-right text-xs ${flagged ? "font-medium text-danger" : "text-muted-foreground"}`}>
+        {flagged && <span className="mr-1">⚠</span>}
+        {outcome}
+      </div>
+    </div>
+  );
+}
+
+/** "Today" / "Yesterday" / "N days ago" from two yyyy-MM-dd strings. */
+function relativeLabel(dayIso: string, todayIso: string): string {
+  const diff = Math.round((new Date(todayIso).getTime() - new Date(dayIso).getTime()) / 86_400_000);
+  if (diff <= 0) return "Today";
+  if (diff === 1) return "Yesterday";
+  return `${diff} days ago`;
+}
+
+function dayStatusLabel(day: DayBehavior): string | null {
+  if (day.firstThought) return day.firstThought.status.replace(/_/g, " ").toUpperCase();
+  if (day.declaredStatus) return day.declaredStatus.replace(/_/g, " ").toUpperCase();
+  return null;
+}
+
+function dayOutcomeLabel(day: DayBehavior): string {
+  if (day.trades.count === 0) return "No trades";
+  return `${day.trades.count} trade${day.trades.count > 1 ? "s" : ""} taken`;
+}
+
 /**
  * The daily "first thought" check-in — a free thought plus a forced
  * completion of "Today my job is ___", analyzed into six psychological
@@ -170,6 +237,13 @@ export function FirstThoughtCard() {
   const result = existing;
   const comparison = result ? computeReadinessComparison(history, date) : null;
   const risks = result ? deriveRisks(result.dimensions, result.biases) : [];
+
+  // The 7-day window that backs the evidence rows — recomputed from stored
+  // data so a surprising Trust Score can be checked against the actual week.
+  const behaviorWindow = useMemo(
+    () => (result?.behavioralContext ? buildBehaviorWindow(history, readinessRules, trades, journalEntries, date, 7) : []),
+    [result?.behavioralContext, history, readinessRules, trades, journalEntries, date],
+  );
 
   const handleAnalyze = async () => {
     const trimmedThought = thought.trim();
@@ -216,6 +290,7 @@ export function FirstThoughtCard() {
         psychologicalLoad: weeklyContext.trades > 0 ? psychologicalLoad : null,
         behavioralContext,
         behavioralAssessment: analysis.behavioralAssessment,
+        biggestConcern: analysis.biggestConcern,
         biases: analysis.biases,
         strengths: analysis.strengths,
         likelyBehaviors: analysis.likelyBehaviors,
@@ -382,18 +457,85 @@ export function FirstThoughtCard() {
 
             {result.behavioralContext && (
               <div
-                className={`space-y-3 rounded-lg border px-4 py-3 ${BEHAVIOR_PATTERN_TONE[result.behavioralContext.currentBehaviorPattern]}`}
+                className={`space-y-4 rounded-xl border-2 px-4 py-4 ${TRAJECTORY_META[result.behavioralContext.trajectory].tone}`}
               >
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  <p className="text-xs font-medium uppercase tracking-wide opacity-80">
-                    Behavioral Trajectory (7 days)
+                  <p className="text-xs font-semibold uppercase tracking-wide opacity-80">
+                    Where you're heading
                   </p>
-                  <span className="rounded-full bg-background/60 px-2.5 py-0.5 text-xs font-semibold">
-                    {result.behavioralContext.currentBehaviorPattern}
-                  </span>
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <span className="rounded-full bg-background/70 px-2.5 py-0.5 text-xs font-semibold">
+                      {TRAJECTORY_META[result.behavioralContext.trajectory].emoji}{" "}
+                      {result.behavioralContext.trajectory}
+                    </span>
+                    <span
+                      className={`rounded-full border px-2.5 py-0.5 text-xs font-semibold ${BEHAVIOR_PATTERN_TONE[result.behavioralContext.currentBehaviorPattern]}`}
+                    >
+                      {result.behavioralContext.currentBehaviorPattern}
+                    </span>
+                  </div>
                 </div>
-                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                  <StatChip label="Trust Score" value={String(result.behavioralContext.trustScore)} />
+
+                {result.biggestConcern && (
+                  <div className="space-y-1">
+                    <p className="text-[10px] font-semibold uppercase tracking-wide opacity-70">
+                      Biggest concern
+                    </p>
+                    <p className="text-lg font-semibold leading-snug">{result.biggestConcern}</p>
+                  </div>
+                )}
+
+                <div className="rounded-lg border border-border bg-background/50 px-4 py-3 text-foreground">
+                  <div className="flex items-center justify-between">
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                      Self Trust
+                    </p>
+                    <TrustDelta delta={result.behavioralContext.trustDelta} />
+                  </div>
+                  <div className="mt-1 flex items-baseline gap-2">
+                    <span className="text-3xl font-bold tabular-nums">
+                      {result.behavioralContext.trustScore}
+                    </span>
+                    <span className="text-xs text-muted-foreground">/ 100</span>
+                  </div>
+                  {(result.behavioralContext.trustBuilders.length > 0 ||
+                    result.behavioralContext.trustDestroyers.length > 0) && (
+                    <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                      {result.behavioralContext.trustBuilders.length > 0 && (
+                        <div className="space-y-1">
+                          <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                            Built by
+                          </p>
+                          <ul className="space-y-0.5 text-sm">
+                            {result.behavioralContext.trustBuilders.map((b) => (
+                              <li key={b} className="flex items-start gap-1.5">
+                                <span className="text-success">✓</span>
+                                <span>{b}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                      {result.behavioralContext.trustDestroyers.length > 0 && (
+                        <div className="space-y-1">
+                          <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                            Destroyed by
+                          </p>
+                          <ul className="space-y-0.5 text-sm">
+                            {result.behavioralContext.trustDestroyers.map((d) => (
+                              <li key={d} className="flex items-start gap-1.5">
+                                <span className="text-danger">✗</span>
+                                <span>{d}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-3 gap-2">
                   <StatChip label="Consistency" value={String(result.behavioralContext.consistencyScore)} />
                   <StatChip label="Followed Plan" value={`${result.behavioralContext.followedPlanRate}%`} />
                   <StatChip
@@ -401,8 +543,37 @@ export function FirstThoughtCard() {
                     value={String(result.behavioralContext.consecutiveViolations)}
                   />
                 </div>
+
                 {result.behavioralAssessment && (
                   <p className="text-sm text-foreground">{result.behavioralAssessment}</p>
+                )}
+
+                {behaviorWindow.length > 0 && (
+                  <details className="group rounded-lg border border-border bg-background/40 px-4 py-2">
+                    <summary className="cursor-pointer list-none text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                      <span className="group-open:hidden">Show the evidence ▸</span>
+                      <span className="hidden group-open:inline">Hide the evidence ▾</span>
+                    </summary>
+                    <div className="mt-2 divide-y divide-border">
+                      {behaviorWindow
+                        .filter((d) => d.firstThought || d.declaredStatus || d.trades.count > 0)
+                        .map((d) => (
+                          <EvidenceRow
+                            key={d.date}
+                            when={relativeLabel(d.date, date)}
+                            status={dayStatusLabel(d)}
+                            outcome={dayOutcomeLabel(d)}
+                            flagged={d.violated}
+                          />
+                        ))}
+                      <EvidenceRow
+                        when="Today"
+                        status={STATUS_META[result.status].label}
+                        outcome={`"${result.jobStatement}"`}
+                        flagged={false}
+                      />
+                    </div>
+                  </details>
                 )}
               </div>
             )}

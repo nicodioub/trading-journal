@@ -208,4 +208,10 @@ export const MIGRATIONS: Migration[] = [
       `ALTER TABLE first_thoughts ADD COLUMN behavioral_assessment TEXT NOT NULL DEFAULT '';`,
     ],
   },
+  {
+    version: 8,
+    statements: [
+      `ALTER TABLE first_thoughts ADD COLUMN biggest_concern TEXT NOT NULL DEFAULT '';`,
+    ],
+  },
 ];

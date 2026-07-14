@@ -116,9 +116,22 @@ export type BehaviorPattern = z.infer<typeof behaviorPatternSchema>;
  * context snapshots: the UI must be able to truthfully show what evidence
  * informed a given day's assessment.
  */
+export const trajectoryStateSchema = z.enum([
+  "Identity Stable",
+  "Rebuilding Discipline",
+  "Losing Consistency",
+  "Breaking Self Trust",
+]);
+export type TrajectoryState = z.infer<typeof trajectoryStateSchema>;
+
 export const behavioralContextSnapshotSchema = z
   .object({
     trustScore: z.number().min(0).max(100),
+    // Defaults on the fields below keep older stored snapshots (written before
+    // these were added) parseable — they simply read as neutral.
+    trustDelta: z.number().default(0),
+    trustBuilders: z.array(z.string()).default([]),
+    trustDestroyers: z.array(z.string()).default([]),
     consistencyScore: z.number().min(0).max(100),
     disciplineTrend: z.enum(["improving", "stable", "declining"]),
     emotionalMomentum: z.number(),
@@ -131,6 +144,7 @@ export const behavioralContextSnapshotSchema = z
     averageReadiness: z.number().nullable(),
     averagePsychologicalLoad: z.number().nullable(),
     currentBehaviorPattern: behaviorPatternSchema,
+    trajectory: trajectoryStateSchema.default("Identity Stable"),
   })
   .nullable();
 export type BehavioralContextSnapshot = z.infer<typeof behavioralContextSnapshotSchema>;
@@ -178,6 +192,8 @@ export const firstThoughtSchema = z.object({
   behavioralContext: behavioralContextSnapshotSchema.default(null),
   /** The model's longitudinal, coach-style read on the trailing behavioral window — how today's mindset compares to recent days, not just today in isolation. */
   behavioralAssessment: z.string().default(""),
+  /** The single most important behavioral truth of the week, one sentence, pinned above everything else. */
+  biggestConcern: z.string().default(""),
   createdAt: timestampSchema,
 });
 export type FirstThought = z.infer<typeof firstThoughtSchema>;

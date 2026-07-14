@@ -7,6 +7,7 @@ import type {
   ReadinessRule,
   ReadinessStatus,
   Trade,
+  TrajectoryState,
 } from "../models";
 import { computeRR, getOutcome } from "./tradeStats";
 
@@ -143,6 +144,12 @@ export function buildBehaviorWindow(
 
 export interface BehavioralContext {
   trustScore: number;
+  /** Net self-trust points gained (+) or lost (−) across the window, relative to a neutral 70 baseline. This is the "↓ −18 this week" number. */
+  trustDelta: number;
+  /** Plain-language reasons trust was earned this window (the "built by" list). */
+  trustBuilders: string[];
+  /** Plain-language reasons trust was lost this window (the "destroyed by" list). */
+  trustDestroyers: string[];
   consistencyScore: number;
   disciplineTrend: "improving" | "stable" | "declining";
   emotionalMomentum: number;
@@ -155,6 +162,7 @@ export interface BehavioralContext {
   averageReadiness: number | null;
   averagePsychologicalLoad: number | null;
   currentBehaviorPattern: BehaviorPattern;
+  trajectory: TrajectoryState;
 }
 
 function average(values: number[]): number | null {
@@ -185,8 +193,24 @@ function trailingDayStreak(window: DayBehavior[], type: "loss" | "win"): number 
   return count;
 }
 
+/** The deterministic indicators, before the two classification labels are attached. */
+type BehavioralBase = Omit<BehavioralContext, "currentBehaviorPattern" | "trajectory">;
+
+/**
+ * The trajectory label: which direction the identity is moving. Severe active
+ * decline reads as "Breaking Self Trust"; improving discipline after a recent
+ * break is "Rebuilding Discipline"; slipping-but-not-broken is "Losing
+ * Consistency"; solid and steady is "Identity Stable".
+ */
+function classifyTrajectory(ctx: BehavioralBase): TrajectoryState {
+  if (ctx.consecutiveViolations >= 2 || ctx.trustDelta <= -12) return "Breaking Self Trust";
+  if (ctx.disciplineTrend === "improving" && ctx.daysSinceLastRuleBreak !== null) return "Rebuilding Discipline";
+  if (ctx.disciplineTrend === "declining" || ctx.followedPlanRate < 70 || ctx.trustDelta < 0) return "Losing Consistency";
+  return "Identity Stable";
+}
+
 function classifyPattern(
-  ctx: Omit<BehavioralContext, "currentBehaviorPattern">,
+  ctx: BehavioralBase,
   window: DayBehavior[],
 ): BehaviorPattern {
   const avgOutcomeAttachment = avgDimension(window, "outcomeAttachment");
@@ -267,25 +291,48 @@ export function computeBehavioralContext(window: DayBehavior[]): BehavioralConte
   const consistencyScore =
     disciplineValues.length >= 2 ? Math.round(Math.max(0, 100 - stddev(disciplineValues) * 20)) : 100;
 
-  // The penalty scales with how hard the recommendation was ignored: one
-  // trade through a no-trade day costs 5, each additional trade adds 1 (cap
-  // 10) — five trades on a "do not trade" day is a different event than one.
-  let trust = 70;
+  // Trust accrues from a neutral 70 baseline. The violation penalty scales
+  // with how hard the recommendation was ignored: one trade through a
+  // no-trade day costs 5, each additional trade adds 1 (cap 10) — five
+  // trades on a "do not trade" day is a different event than one. netDelta
+  // is the unclamped sum of adjustments: the "points earned/lost this week".
+  let netDelta = 0;
+  let cleanDays = 0;
+  let escalatedOnRestricted = false;
   for (const day of window) {
     if (day.violated) {
       const isNoTrade = day.declaredStatus === "no_trade" || day.firstThought?.status === "no_trade";
       const base = isNoTrade ? 5 : 3;
-      trust -= Math.min(base + Math.max(0, day.trades.count - 1), 10);
+      netDelta -= Math.min(base + Math.max(0, day.trades.count - 1), 10);
+      if (day.trades.count >= 3) escalatedOnRestricted = true;
     } else if (day.compliant) {
-      trust += 2;
+      netDelta += 2;
     } else if (day.firstThought && !day.restricted) {
-      trust += 1;
+      netDelta += 1;
+      cleanDays += 1;
     }
-    trust = Math.max(0, Math.min(100, trust));
   }
+  const trustScore = Math.round(Math.max(0, Math.min(100, 70 + netDelta)));
+  const trustDelta = Math.round(netDelta);
+
+  const trustBuilders: string[] = [];
+  if (recoveryAttempts > 0)
+    trustBuilders.push(`Stayed out on ${recoveryAttempts} day${recoveryAttempts > 1 ? "s" : ""} you flagged as unfit`);
+  if (cleanDays > 0)
+    trustBuilders.push(`Followed your plan on ${cleanDays} clear day${cleanDays > 1 ? "s" : ""}`);
+
+  const trustDestroyers: string[] = [];
+  if (noTradeViolations > 0)
+    trustDestroyers.push(`Traded after a "no trade" call (${noTradeViolations}×)`);
+  if (highRiskViolations > 0)
+    trustDestroyers.push(`Traded on a high-risk day (${highRiskViolations}×)`);
+  if (escalatedOnRestricted) trustDestroyers.push("Took multiple positions on a day you'd flagged");
 
   const base = {
-    trustScore: Math.round(trust),
+    trustScore,
+    trustDelta,
+    trustBuilders,
+    trustDestroyers,
     consistencyScore,
     disciplineTrend,
     emotionalMomentum,
@@ -299,5 +346,9 @@ export function computeBehavioralContext(window: DayBehavior[]): BehavioralConte
     averagePsychologicalLoad,
   };
 
-  return { ...base, currentBehaviorPattern: classifyPattern(base, window) };
+  return {
+    ...base,
+    currentBehaviorPattern: classifyPattern(base, window),
+    trajectory: classifyTrajectory(base),
+  };
 }

@@ -647,6 +647,7 @@ interface FirstThoughtRow {
   psychological_load: string;
   behavioral_context: string;
   behavioral_assessment: string;
+  biggest_concern: string;
   created_at: string;
 }
 
@@ -675,6 +676,7 @@ function rowToFirstThought(row: FirstThoughtRow): FirstThought {
     psychologicalLoad: JSON.parse(row.psychological_load),
     behavioralContext: JSON.parse(row.behavioral_context),
     behavioralAssessment: row.behavioral_assessment,
+    biggestConcern: row.biggest_concern,
     createdAt: row.created_at,
   });
 }
@@ -714,7 +716,7 @@ const firstThoughtRepository: FirstThoughtRepository = {
           readiness_score=$5, status=$6, alignment_score=$7, confidence_score=$8, primary_focus=$9,
           explanation=$10, biases=$11, strengths=$12, likely_behaviors=$13, reframe=$14, mission=$15,
           suggested_action=$16, ai_observations=$17, chess_context=$18, weekly_context=$19, psychological_load=$20,
-          behavioral_context=$21, behavioral_assessment=$22
+          behavioral_context=$21, behavioral_assessment=$22, biggest_concern=$23
           WHERE date=$1`,
         [
           input.date,
@@ -739,6 +741,7 @@ const firstThoughtRepository: FirstThoughtRepository = {
           psychologicalLoadJson,
           behavioralContextJson,
           input.behavioralAssessment ?? "",
+          input.biggestConcern ?? "",
         ],
       );
       return { ...existing, ...input };
@@ -753,8 +756,8 @@ const firstThoughtRepository: FirstThoughtRepository = {
         (id, date, thought, job_statement, dimensions, readiness_score, status, alignment_score,
          confidence_score, primary_focus, explanation, biases, strengths, likely_behaviors, reframe,
          mission, suggested_action, ai_observations, chess_context, weekly_context, psychological_load,
-         behavioral_context, behavioral_assessment, created_at)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24)`,
+         behavioral_context, behavioral_assessment, biggest_concern, created_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25)`,
       [
         check.id,
         check.date,
@@ -779,6 +782,7 @@ const firstThoughtRepository: FirstThoughtRepository = {
         JSON.stringify(check.psychologicalLoad),
         JSON.stringify(check.behavioralContext),
         check.behavioralAssessment,
+        check.biggestConcern,
         check.createdAt,
       ],
     );
