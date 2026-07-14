@@ -14,13 +14,18 @@ import {
   useChessStatsList,
   useFirstThought,
   useFirstThoughts,
+  useJournalEntries,
+  useMentalCheck,
+  useReadinessRules,
   useSaveFirstThought,
   useSettings,
   useTrades,
 } from "@/data";
-import type { FirstThoughtStatus, PsychDimensions } from "@/domain";
+import type { BehaviorPattern, FirstThoughtStatus, PsychDimensions } from "@/domain";
 import {
   applyChessAdjustment,
+  buildBehaviorWindow,
+  computeBehavioralContext,
   computeChessContext,
   computePsychologicalLoad,
   computeReadinessComparison,
@@ -64,6 +69,16 @@ const STATUS_META: Record<
     tone: "border-danger/50 bg-danger/10 text-danger",
     ring: "hsl(var(--danger))",
   },
+};
+
+const BEHAVIOR_PATTERN_TONE: Record<BehaviorPattern, string> = {
+  Disciplined: "border-success/40 bg-success/10 text-success",
+  Patient: "border-success/40 bg-success/10 text-success",
+  "Outcome Attached": "border-warning/40 bg-warning/10 text-warning",
+  Overconfident: "border-warning/40 bg-warning/10 text-warning",
+  Fearful: "border-danger/30 bg-danger/5 text-danger/90",
+  "Forcing Trades": "border-danger/40 bg-danger/10 text-danger",
+  "Revenge Trading": "border-danger/50 bg-danger/10 text-danger",
 };
 
 const DIMENSION_META: Array<{ key: keyof PsychDimensions; label: string }> = [
@@ -143,6 +158,9 @@ export function FirstThoughtCard() {
   const { data: history = [] } = useFirstThoughts();
   const { data: chessStats = [] } = useChessStatsList();
   const { data: trades = [] } = useTrades();
+  const { data: readinessRules = [] } = useReadinessRules();
+  const { data: journalEntries = [] } = useJournalEntries();
+  const { data: mentalCheck } = useMentalCheck(date);
   const save = useSaveFirstThought();
   const [thought, setThought] = useState("");
   const [jobStatement, setJobStatement] = useState("");
@@ -167,14 +185,17 @@ export function FirstThoughtCard() {
       const chessContext = computeChessContext(chessStats, date);
       const weeklyContext = computeWeeklyTradingContext(trades, date);
       const psychologicalLoad = computePsychologicalLoad(weeklyContext, chessContext);
-      const analysis = await analyzeFirstThought(
-        trimmedThought,
-        trimmedJob,
-        settings.openaiApiKey,
-        chessContext,
-        weeklyContext.trades > 0 ? weeklyContext : null,
-        weeklyContext.trades > 0 ? psychologicalLoad : null,
-      );
+      const behaviorWindow = buildBehaviorWindow(history, readinessRules, trades, journalEntries, date, 7);
+      const behavioralContext = computeBehavioralContext(behaviorWindow);
+      const analysis = await analyzeFirstThought(trimmedThought, trimmedJob, settings.openaiApiKey, {
+        chess: chessContext,
+        weekly: weeklyContext.trades > 0 ? weeklyContext : null,
+        psychLoad: weeklyContext.trades > 0 ? psychologicalLoad : null,
+        behaviorWindow,
+        behavioralContext,
+        mentalCheck,
+        openTrades: trades.filter((t) => t.status === "open"),
+      });
       const baseScore = computeReadinessScore(analysis.dimensions);
       const readinessScore = applyChessAdjustment(baseScore, chessContext);
       const status = statusForScore(readinessScore);
@@ -193,6 +214,8 @@ export function FirstThoughtCard() {
         chessContext,
         weeklyContext: weeklyContext.trades > 0 ? weeklyContext : null,
         psychologicalLoad: weeklyContext.trades > 0 ? psychologicalLoad : null,
+        behavioralContext,
+        behavioralAssessment: analysis.behavioralAssessment,
         biases: analysis.biases,
         strengths: analysis.strengths,
         likelyBehaviors: analysis.likelyBehaviors,
@@ -354,6 +377,33 @@ export function FirstThoughtCard() {
                   AI Observations
                 </p>
                 <p className="text-sm">{result.aiObservations}</p>
+              </div>
+            )}
+
+            {result.behavioralContext && (
+              <div
+                className={`space-y-3 rounded-lg border px-4 py-3 ${BEHAVIOR_PATTERN_TONE[result.behavioralContext.currentBehaviorPattern]}`}
+              >
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-xs font-medium uppercase tracking-wide opacity-80">
+                    Behavioral Trajectory (7 days)
+                  </p>
+                  <span className="rounded-full bg-background/60 px-2.5 py-0.5 text-xs font-semibold">
+                    {result.behavioralContext.currentBehaviorPattern}
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                  <StatChip label="Trust Score" value={String(result.behavioralContext.trustScore)} />
+                  <StatChip label="Consistency" value={String(result.behavioralContext.consistencyScore)} />
+                  <StatChip label="Followed Plan" value={`${result.behavioralContext.followedPlanRate}%`} />
+                  <StatChip
+                    label="Consecutive Violations"
+                    value={String(result.behavioralContext.consecutiveViolations)}
+                  />
+                </div>
+                {result.behavioralAssessment && (
+                  <p className="text-sm text-foreground">{result.behavioralAssessment}</p>
+                )}
               </div>
             )}
 

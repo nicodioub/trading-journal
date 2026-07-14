@@ -645,6 +645,8 @@ interface FirstThoughtRow {
   chess_context: string;
   weekly_context: string;
   psychological_load: string;
+  behavioral_context: string;
+  behavioral_assessment: string;
   created_at: string;
 }
 
@@ -671,6 +673,8 @@ function rowToFirstThought(row: FirstThoughtRow): FirstThought {
     chessContext: JSON.parse(row.chess_context),
     weeklyContext: JSON.parse(row.weekly_context),
     psychologicalLoad: JSON.parse(row.psychological_load),
+    behavioralContext: JSON.parse(row.behavioral_context),
+    behavioralAssessment: row.behavioral_assessment,
     createdAt: row.created_at,
   });
 }
@@ -703,12 +707,14 @@ const firstThoughtRepository: FirstThoughtRepository = {
     const chessContextJson = JSON.stringify(input.chessContext ?? null);
     const weeklyContextJson = JSON.stringify(input.weeklyContext ?? null);
     const psychologicalLoadJson = JSON.stringify(input.psychologicalLoad ?? null);
+    const behavioralContextJson = JSON.stringify(input.behavioralContext ?? null);
     if (existing) {
       await db.execute(
         `UPDATE first_thoughts SET thought=$2, job_statement=$3, dimensions=$4,
           readiness_score=$5, status=$6, alignment_score=$7, confidence_score=$8, primary_focus=$9,
           explanation=$10, biases=$11, strengths=$12, likely_behaviors=$13, reframe=$14, mission=$15,
-          suggested_action=$16, ai_observations=$17, chess_context=$18, weekly_context=$19, psychological_load=$20
+          suggested_action=$16, ai_observations=$17, chess_context=$18, weekly_context=$19, psychological_load=$20,
+          behavioral_context=$21, behavioral_assessment=$22
           WHERE date=$1`,
         [
           input.date,
@@ -731,6 +737,8 @@ const firstThoughtRepository: FirstThoughtRepository = {
           chessContextJson,
           weeklyContextJson,
           psychologicalLoadJson,
+          behavioralContextJson,
+          input.behavioralAssessment ?? "",
         ],
       );
       return { ...existing, ...input };
@@ -744,8 +752,9 @@ const firstThoughtRepository: FirstThoughtRepository = {
       `INSERT INTO first_thoughts
         (id, date, thought, job_statement, dimensions, readiness_score, status, alignment_score,
          confidence_score, primary_focus, explanation, biases, strengths, likely_behaviors, reframe,
-         mission, suggested_action, ai_observations, chess_context, weekly_context, psychological_load, created_at)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22)`,
+         mission, suggested_action, ai_observations, chess_context, weekly_context, psychological_load,
+         behavioral_context, behavioral_assessment, created_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24)`,
       [
         check.id,
         check.date,
@@ -768,6 +777,8 @@ const firstThoughtRepository: FirstThoughtRepository = {
         JSON.stringify(check.chessContext),
         JSON.stringify(check.weeklyContext),
         JSON.stringify(check.psychologicalLoad),
+        JSON.stringify(check.behavioralContext),
+        check.behavioralAssessment,
         check.createdAt,
       ],
     );

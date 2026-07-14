@@ -201,4 +201,11 @@ export const MIGRATIONS: Migration[] = [
       );`,
     ],
   },
+  {
+    version: 7,
+    statements: [
+      `ALTER TABLE first_thoughts ADD COLUMN behavioral_context TEXT NOT NULL DEFAULT 'null';`,
+      `ALTER TABLE first_thoughts ADD COLUMN behavioral_assessment TEXT NOT NULL DEFAULT '';`,
+    ],
+  },
 ];

@@ -98,6 +98,43 @@ export const psychologicalLoadSnapshotSchema = z
   .nullable();
 export type PsychologicalLoadSnapshot = z.infer<typeof psychologicalLoadSnapshotSchema>;
 
+export const behaviorPatternSchema = z.enum([
+  "Disciplined",
+  "Revenge Trading",
+  "Forcing Trades",
+  "Patient",
+  "Outcome Attached",
+  "Fearful",
+  "Overconfident",
+]);
+export type BehaviorPattern = z.infer<typeof behaviorPatternSchema>;
+
+/**
+ * Snapshot of the deterministic Behavior Engine output — the trailing 7-day
+ * rolling read on discipline and self-trust — sent to the model at analysis
+ * time and stored (not recomputed later) for the same reason as the other
+ * context snapshots: the UI must be able to truthfully show what evidence
+ * informed a given day's assessment.
+ */
+export const behavioralContextSnapshotSchema = z
+  .object({
+    trustScore: z.number().min(0).max(100),
+    consistencyScore: z.number().min(0).max(100),
+    disciplineTrend: z.enum(["improving", "stable", "declining"]),
+    emotionalMomentum: z.number(),
+    noTradeViolations: z.number(),
+    highRiskViolations: z.number(),
+    consecutiveViolations: z.number(),
+    recoveryAttempts: z.number(),
+    daysSinceLastRuleBreak: z.number().nullable(),
+    followedPlanRate: z.number().min(0).max(100),
+    averageReadiness: z.number().nullable(),
+    averagePsychologicalLoad: z.number().nullable(),
+    currentBehaviorPattern: behaviorPatternSchema,
+  })
+  .nullable();
+export type BehavioralContextSnapshot = z.infer<typeof behavioralContextSnapshotSchema>;
+
 /**
  * Daily "first thought" check-in — a free-form first thought plus a forced
  * "today my job is ___" completion, analyzed by an LLM into psychological
@@ -137,6 +174,10 @@ export const firstThoughtSchema = z.object({
   weeklyContext: weeklyContextSnapshotSchema.default(null),
   /** Deterministic psychological load index derived from the weekly context, or null if not computed. */
   psychologicalLoad: psychologicalLoadSnapshotSchema.default(null),
+  /** Deterministic Behavior Engine output over the trailing 7 days, or null if there wasn't enough history. */
+  behavioralContext: behavioralContextSnapshotSchema.default(null),
+  /** The model's longitudinal, coach-style read on the trailing behavioral window — how today's mindset compares to recent days, not just today in isolation. */
+  behavioralAssessment: z.string().default(""),
   createdAt: timestampSchema,
 });
 export type FirstThought = z.infer<typeof firstThoughtSchema>;
