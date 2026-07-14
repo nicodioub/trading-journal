@@ -1,9 +1,11 @@
-import { Target } from "lucide-react";
-import { useMemo, useState } from "react";
+import { Lock, Target, Trash2 } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 import { PageHeader } from "@/components/layout";
 import {
+  Button,
   Card,
   CardContent,
+  ConfirmDialog,
   EmptyState,
   Input,
   Label,
@@ -14,8 +16,19 @@ import {
   SelectValue,
   StatTile,
 } from "@/components/ui";
-import { useAccounts } from "@/data";
-import { buildWeeklyPlan } from "@/domain";
+import {
+  useAccounts,
+  useDeletePlanningObjective,
+  usePlanningObjective,
+  useSavePlanningObjective,
+  useTrades,
+} from "@/data";
+import {
+  buildEquityCurve,
+  buildWeeklyPlan,
+  computeAccountSummary,
+  computePlanProgress,
+} from "@/domain";
 import { formatCurrency, formatDate, formatPercent } from "@/lib/format";
 
 export function PlanningPage() {
@@ -25,19 +38,58 @@ export function PlanningPage() {
   const [weeks, setWeeks] = useState(12);
 
   const account = accounts.find((a) => a.id === accountId) ?? accounts[0];
+  const { data: trades = [] } = useTrades({ accountId: account?.id });
+  const { data: objective } = usePlanningObjective(account?.id);
+  const saveObjective = useSavePlanningObjective();
+  const deleteObjective = useDeletePlanningObjective();
+
+  const currentBalance = useMemo(() => {
+    if (!account) return 0;
+    return account.initialCapital + computeAccountSummary(account, trades).totalPnl;
+  }, [account, trades]);
+
+  // The saved objective, if any, drives the plan; otherwise use the draft form.
+  const draftMode = !objective;
 
   const plan = useMemo(() => {
     if (!account) return [];
-    return buildWeeklyPlan(account.currentBalance, weeklyGrowthPercent, weeks);
-  }, [account, weeklyGrowthPercent, weeks]);
+    if (objective) {
+      return buildWeeklyPlan(
+        objective.startBalance,
+        objective.weeklyGrowthPercent,
+        objective.weeks,
+        new Date(objective.startDate),
+      );
+    }
+    return buildWeeklyPlan(currentBalance, weeklyGrowthPercent, weeks);
+  }, [account, objective, currentBalance, weeklyGrowthPercent, weeks]);
+
+  const equityCurve = useMemo(() => {
+    if (!account) return [];
+    return buildEquityCurve(account.initialCapital, trades);
+  }, [account, trades]);
+
+  const progress = useMemo(
+    () => computePlanProgress(plan, equityCurve),
+    [plan, equityCurve],
+  );
 
   const finalWeek = plan.at(-1);
+
+  // Reset the draft inputs whenever the account or its objective changes, so
+  // stale numbers from a previous account don't linger in the form.
+  useEffect(() => {
+    if (objective) {
+      setWeeklyGrowthPercent(objective.weeklyGrowthPercent);
+      setWeeks(objective.weeks);
+    }
+  }, [objective]);
 
   return (
     <div>
       <PageHeader
         title="Planning"
-        description="Set a weekly growth objective and project where an account lands over time."
+        description="Set a weekly growth objective and track real progress against it over time."
       />
 
       {accounts.length === 0 ? (
@@ -75,6 +127,7 @@ export function PlanningPage() {
                   type="number"
                   step="0.1"
                   value={weeklyGrowthPercent}
+                  disabled={!draftMode}
                   onChange={(e) => setWeeklyGrowthPercent(Number(e.target.value))}
                 />
               </div>
@@ -86,27 +139,69 @@ export function PlanningPage() {
                   min={1}
                   step="1"
                   value={weeks}
+                  disabled={!draftMode}
                   onChange={(e) =>
                     setWeeks(Math.max(1, Math.round(Number(e.target.value))))
                   }
                 />
               </div>
             </CardContent>
+
+            {account && (
+              <CardContent className="flex items-center justify-between gap-3 pt-0">
+                {objective ? (
+                  <>
+                    <p className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                      <Lock className="h-3.5 w-3.5" />
+                      Objective saved on {formatDate(objective.createdAt)}. Delete it to
+                      set a new one.
+                    </p>
+                    <ConfirmDialog
+                      title="Delete this objective?"
+                      description="This removes the saved plan for this account. You can set a new one right after."
+                      onConfirm={() => deleteObjective.mutate(account.id)}
+                      trigger={
+                        <Button variant="ghost" size="sm">
+                          <Trash2 className="h-4 w-4 text-danger" />
+                          Delete objective
+                        </Button>
+                      }
+                    />
+                  </>
+                ) : (
+                  <Button
+                    size="sm"
+                    onClick={() =>
+                      saveObjective.mutate({
+                        accountId: account.id,
+                        startBalance: currentBalance,
+                        weeklyGrowthPercent,
+                        weeks,
+                        startDate: new Date().toISOString(),
+                      })
+                    }
+                  >
+                    <Target className="h-4 w-4" />
+                    Save as objective
+                  </Button>
+                )}
+              </CardContent>
+            )}
           </Card>
 
           {account && finalWeek && (
             <div className="grid gap-4 sm:grid-cols-3">
               <StatTile
-                label="Starting balance"
-                value={formatCurrency(account.currentBalance, account.currency)}
+                label="Current balance"
+                value={formatCurrency(currentBalance, account.currency)}
               />
               <StatTile
-                label={`Projected balance (week ${weeks})`}
+                label={`Target balance (week ${plan.length - 1})`}
                 value={formatCurrency(finalWeek.balance, account.currency)}
                 intent="positive"
               />
               <StatTile
-                label="Total projected growth"
+                label="Total target growth"
                 value={formatPercent(finalWeek.cumulativePercent)}
                 intent="positive"
               />
@@ -124,10 +219,13 @@ export function PlanningPage() {
                       <th className="py-2 pr-4 font-medium">Target balance</th>
                       <th className="py-2 pr-4 font-medium">Gain this week</th>
                       <th className="py-2 pr-4 font-medium">Cumulative growth</th>
+                      {objective && (
+                        <th className="py-2 pr-4 font-medium">Actual vs. target</th>
+                      )}
                     </tr>
                   </thead>
                   <tbody>
-                    {plan.map((row) => (
+                    {progress.map((row) => (
                       <tr key={row.week} className="border-b border-border/50 last:border-0">
                         <td className="py-2 pr-4 tabular-nums">{row.week}</td>
                         <td className="py-2 pr-4 tabular-nums text-muted-foreground">
@@ -151,6 +249,22 @@ export function PlanningPage() {
                         <td className="py-2 pr-4 tabular-nums text-success">
                           {row.week === 0 ? "—" : formatPercent(row.cumulativePercent)}
                         </td>
+                        {objective && (
+                          <td className="py-2 pr-4 tabular-nums">
+                            {row.actualBalance === null ? (
+                              <span className="text-muted-foreground">—</span>
+                            ) : (
+                              <span
+                                className={
+                                  (row.aheadPercent ?? 0) >= 0 ? "text-success" : "text-danger"
+                                }
+                              >
+                                {formatCurrency(row.actualBalance, account?.currency)} (
+                                {formatPercent(row.aheadPercent ?? 0)})
+                              </span>
+                            )}
+                          </td>
+                        )}
                       </tr>
                     ))}
                   </tbody>

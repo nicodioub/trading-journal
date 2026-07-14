@@ -16,13 +16,16 @@ import {
   useFirstThoughts,
   useSaveFirstThought,
   useSettings,
+  useTrades,
 } from "@/data";
 import type { FirstThoughtStatus, PsychDimensions } from "@/domain";
 import {
   applyChessAdjustment,
   computeChessContext,
+  computePsychologicalLoad,
   computeReadinessComparison,
   computeReadinessScore,
+  computeWeeklyTradingContext,
   deriveRisks,
   statusForScore,
 } from "@/domain";
@@ -139,6 +142,7 @@ export function FirstThoughtCard() {
   const { data: existing } = useFirstThought(date);
   const { data: history = [] } = useFirstThoughts();
   const { data: chessStats = [] } = useChessStatsList();
+  const { data: trades = [] } = useTrades();
   const save = useSaveFirstThought();
   const [thought, setThought] = useState("");
   const [jobStatement, setJobStatement] = useState("");
@@ -161,11 +165,15 @@ export function FirstThoughtCard() {
     setAnalyzing(true);
     try {
       const chessContext = computeChessContext(chessStats, date);
+      const weeklyContext = computeWeeklyTradingContext(trades, date);
+      const psychologicalLoad = computePsychologicalLoad(weeklyContext, chessContext);
       const analysis = await analyzeFirstThought(
         trimmedThought,
         trimmedJob,
         settings.openaiApiKey,
         chessContext,
+        weeklyContext.trades > 0 ? weeklyContext : null,
+        weeklyContext.trades > 0 ? psychologicalLoad : null,
       );
       const baseScore = computeReadinessScore(analysis.dimensions);
       const readinessScore = applyChessAdjustment(baseScore, chessContext);
@@ -183,6 +191,8 @@ export function FirstThoughtCard() {
         explanation: analysis.explanation,
         aiObservations: analysis.aiObservations,
         chessContext,
+        weeklyContext: weeklyContext.trades > 0 ? weeklyContext : null,
+        psychologicalLoad: weeklyContext.trades > 0 ? psychologicalLoad : null,
         biases: analysis.biases,
         strengths: analysis.strengths,
         likelyBehaviors: analysis.likelyBehaviors,
@@ -304,6 +314,39 @@ export function FirstThoughtCard() {
                 <>♟ No chess data was available for this day — analysis is based on writing alone.</>
               )}
             </p>
+
+            {result.weeklyContext && result.weeklyContext.trades > 0 && (
+              <div className="space-y-2 rounded-lg border border-border bg-background/40 px-4 py-3">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                    This Week's Trading
+                  </p>
+                  {result.psychologicalLoad && (
+                    <span className="text-xs font-semibold tabular-nums text-muted-foreground">
+                      Psychological Load: {result.psychologicalLoad.score}/100
+                    </span>
+                  )}
+                </div>
+                <p className="text-sm">
+                  {result.weeklyContext.trades} trades · {result.weeklyContext.wins}W-
+                  {result.weeklyContext.losses}L-{result.weeklyContext.breakevens}BE ·{" "}
+                  {result.weeklyContext.winRate.toFixed(0)}% win rate
+                  {result.weeklyContext.currentStreak.type !== "none" && (
+                    <>
+                      {" "}
+                      · {result.weeklyContext.currentStreak.count} consecutive{" "}
+                      {result.weeklyContext.currentStreak.type}
+                      {result.weeklyContext.currentStreak.count > 1 ? "s" : ""}
+                    </>
+                  )}
+                </p>
+                {result.psychologicalLoad && result.psychologicalLoad.drivers.length > 0 && (
+                  <p className="text-xs text-muted-foreground">
+                    Drivers: {result.psychologicalLoad.drivers.join(" · ")}
+                  </p>
+                )}
+              </div>
+            )}
 
             {result.aiObservations && (
               <div className="space-y-1 rounded-lg border border-border bg-background/40 px-4 py-3">

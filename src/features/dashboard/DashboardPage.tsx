@@ -1,10 +1,10 @@
-import { Flame, Percent, TrendingUp, Wallet } from "lucide-react";
+import { Flame, Percent, Trophy, TrendingUp } from "lucide-react";
 import { useMemo } from "react";
 import { StatTile } from "@/components/ui";
 import { useAccounts, useSettings, useTrades } from "@/data";
 import { getSessionSplashQuote } from "@/data/splashQuotes";
-import { computePerformanceStats } from "@/domain";
-import { formatCurrency, formatPercent } from "@/lib/format";
+import { computeAccountSummary, computePerformanceStats } from "@/domain";
+import { formatCurrency, formatPercent, formatSignedPercent } from "@/lib/format";
 import { AccountBalancesWidget } from "./components/AccountBalancesWidget";
 import { ChessThermometerCard } from "./components/ChessThermometerCard";
 import { FirstThoughtCard } from "./components/FirstThoughtCard";
@@ -19,8 +19,21 @@ export function DashboardPage() {
   const perf = useMemo(() => computePerformanceStats(trades), [trades]);
 
   const currency = accounts[0]?.currency ?? settings?.defaultCurrency ?? "USD";
-  const totalInitial = accounts.reduce((sum, a) => sum + a.initialCapital, 0);
-  const totalBalance = totalInitial + perf.totalPnl;
+
+  // Accounts can be very different in nature (prop-firm challenge vs. live
+  // broker), so summing their balances into one number is meaningless —
+  // surface the best performer instead.
+  const bestAccount = useMemo(() => {
+    let best: { name: string; returnPct: number } | null = null;
+    for (const account of accounts) {
+      const accountTrades = trades.filter((t) => t.accountId === account.id);
+      const { totalReturnPct } = computeAccountSummary(account, accountTrades);
+      if (!best || totalReturnPct > best.returnPct) {
+        best = { name: account.name, returnPct: totalReturnPct };
+      }
+    }
+    return best;
+  }, [accounts, trades]);
 
   const streak = perf.currentStreak;
   const streakLabel =
@@ -51,10 +64,13 @@ export function DashboardPage() {
       {/* Headline stats */}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <StatTile
-          label="Total balance"
-          value={formatCurrency(totalBalance, currency)}
-          icon={Wallet}
-          hint={`${accounts.length} account${accounts.length === 1 ? "" : "s"}`}
+          label="Best account"
+          value={bestAccount?.name ?? "—"}
+          icon={Trophy}
+          hint={bestAccount ? formatSignedPercent(bestAccount.returnPct) : "No accounts yet"}
+          intent={
+            bestAccount ? (bestAccount.returnPct >= 0 ? "positive" : "negative") : "neutral"
+          }
         />
         <StatTile
           label="Total PnL"

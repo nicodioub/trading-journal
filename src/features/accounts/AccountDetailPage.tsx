@@ -13,7 +13,7 @@ import {
   StatTile,
 } from "@/components/ui";
 import { useAccount, useDeleteAccount, useTrades } from "@/data";
-import { computeAccountSummary } from "@/domain";
+import { computeAccountSummary, computeWeeklyAccountStat } from "@/domain";
 import {
   formatCurrency,
   formatDate,
@@ -33,6 +33,10 @@ export function AccountDetailPage() {
 
   const summary = useMemo(
     () => (account ? computeAccountSummary(account, trades) : null),
+    [account, trades],
+  );
+  const weekly = useMemo(
+    () => (account ? computeWeeklyAccountStat(account, trades) : null),
     [account, trades],
   );
 
@@ -99,6 +103,14 @@ export function AccountDetailPage() {
 
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <StatTile label="Balance" value={formatCurrency(balance, currency)} />
+        {weekly && (
+          <StatTile
+            label="This week"
+            value={formatSignedPercent(weekly.returnPct)}
+            hint={`${formatCurrency(weekly.pnl, currency, { signed: true })} · ${formatDate(weekly.weekStart)}–${formatDate(weekly.weekEnd)}`}
+            intent={weekly.pnl >= 0 ? "positive" : "negative"}
+          />
+        )}
         <StatTile
           label="Total PnL"
           value={formatCurrency(summary.totalPnl, currency, { signed: true })}

@@ -1,7 +1,7 @@
-import { format, subDays } from "date-fns";
+import { differenceInCalendarDays, endOfWeek, format, startOfWeek, subDays } from "date-fns";
 import type { Bias, BiasTag, FirstThought, FirstThoughtStatus, PsychDimensions, Trade } from "../models";
 import type { ChessContext } from "./chessStats";
-import { getOutcome } from "./tradeStats";
+import { computeRR, getOutcome, tradeTime } from "./tradeStats";
 
 /** Human-readable labels for each detected bias/trait tag. */
 export const BIAS_LABELS: Record<BiasTag, string> = {
@@ -362,4 +362,180 @@ export function computeOutcomeAttachmentExpectancy(
     threshold,
     ...expectancyBreakdown(thoughts, trades, (t) => t.dimensions.outcomeAttachment > threshold),
   };
+}
+
+/* ------------------------- Weekly trading context ------------------------- */
+
+export interface WeeklyTradingContext {
+  weekStart: string;
+  weekEnd: string;
+  trades: number;
+  wins: number;
+  losses: number;
+  breakevens: number;
+  winRate: number;
+  netR: number | null;
+  netPnl: number;
+  largestLoss: number | null;
+  /** Trailing win/loss run across ALL closed trades (decisive outcomes only), not limited to this week. */
+  currentStreak: { type: "win" | "loss" | "none"; count: number };
+  /** Trailing breakeven run across all closed trades. */
+  breakevenStreak: number;
+  daysSinceLastTrade: number | null;
+}
+
+/** Trailing win/loss run, most-recent-first, across all closed trades (decisive outcomes only). */
+function computeOverallStreak(closedSortedDesc: Trade[]): { type: "win" | "loss" | "none"; count: number } {
+  let type: "win" | "loss" | "none" = "none";
+  let count = 0;
+  for (const trade of closedSortedDesc) {
+    const outcome = getOutcome(trade);
+    if (outcome !== "win" && outcome !== "loss") continue;
+    if (type === "none") {
+      type = outcome;
+      count = 1;
+    } else if (outcome === type) {
+      count += 1;
+    } else break;
+  }
+  return { type, count };
+}
+
+/** Trailing run of consecutive breakeven outcomes, most-recent-first, across all closed trades. */
+function computeBreakevenStreak(closedSortedDesc: Trade[]): number {
+  let count = 0;
+  for (const trade of closedSortedDesc) {
+    if (getOutcome(trade) === "breakeven") count += 1;
+    else break;
+  }
+  return count;
+}
+
+/**
+ * This week's (Monday-Sunday) realized trading performance, plus streak and
+ * recency signals computed over ALL closed trades — a losing or winning
+ * streak that started last week still shapes today's psychology even though
+ * it isn't fully "this week's" result.
+ */
+export function computeWeeklyTradingContext(trades: Trade[], todayDate: string): WeeklyTradingContext {
+  const reference = new Date(todayDate);
+  const weekStart = startOfWeek(reference, { weekStartsOn: 1 });
+  const weekEnd = endOfWeek(reference, { weekStartsOn: 1 });
+
+  const closedDesc = trades
+    .filter((t) => t.status === "closed")
+    .sort((a, b) => tradeTime(b) - tradeTime(a));
+
+  const thisWeek = closedDesc.filter((t) => {
+    const time = tradeTime(t);
+    return time >= weekStart.getTime() && time <= weekEnd.getTime();
+  });
+
+  let wins = 0;
+  let losses = 0;
+  let breakevens = 0;
+  let netPnl = 0;
+  let largestLoss: number | null = null;
+  const rrValues: number[] = [];
+
+  for (const trade of thisWeek) {
+    const amount = trade.resultAmount ?? 0;
+    netPnl += amount;
+    const outcome = getOutcome(trade);
+    if (outcome === "win") {
+      wins += 1;
+    } else if (outcome === "loss") {
+      losses += 1;
+      largestLoss = largestLoss === null ? amount : Math.min(largestLoss, amount);
+    } else {
+      breakevens += 1;
+    }
+
+    const rr = computeRR(trade);
+    if (rr !== null) rrValues.push(rr);
+  }
+
+  const decisive = wins + losses;
+  const winRate = decisive > 0 ? (wins / decisive) * 100 : 0;
+  const netR = rrValues.length > 0 ? rrValues.reduce((sum, v) => sum + v, 0) : null;
+
+  const daysSinceLastTrade =
+    closedDesc.length > 0
+      ? Math.max(0, differenceInCalendarDays(reference, new Date(tradeTime(closedDesc[0]))))
+      : null;
+
+  return {
+    weekStart: format(weekStart, "yyyy-MM-dd"),
+    weekEnd: format(weekEnd, "yyyy-MM-dd"),
+    trades: thisWeek.length,
+    wins,
+    losses,
+    breakevens,
+    winRate,
+    netR,
+    netPnl,
+    largestLoss,
+    currentStreak: computeOverallStreak(closedDesc),
+    breakevenStreak: computeBreakevenStreak(closedDesc),
+    daysSinceLastTrade,
+  };
+}
+
+export interface PsychologicalLoad {
+  score: number;
+  drivers: string[];
+}
+
+/**
+ * Deterministic 0-100 "psychological load" index: how much pressure this
+ * week's realized results (plus a same-day cognitive read) are likely
+ * putting on today's decision-making, regardless of direction. Loss streaks
+ * (fear, urge to recover) and win streaks (overconfidence, FOMO) both add
+ * load, as do breakeven streaks (frustration) and long layoffs (rust). This
+ * is context for the model, not a verdict — how a given load actually plays
+ * out for THIS trader still depends on the written check-in.
+ */
+export function computePsychologicalLoad(
+  weekly: WeeklyTradingContext,
+  chess: ChessContext | null,
+): PsychologicalLoad {
+  let score = 0;
+  const drivers: string[] = [];
+
+  if (weekly.currentStreak.type === "loss" && weekly.currentStreak.count >= 2) {
+    score += (Math.min(weekly.currentStreak.count, 6) / 6) * 35;
+    drivers.push(`${weekly.currentStreak.count} consecutive losses`);
+  }
+  if (weekly.currentStreak.type === "win" && weekly.currentStreak.count >= 3) {
+    score += (Math.min(weekly.currentStreak.count, 6) / 6) * 20;
+    drivers.push(`${weekly.currentStreak.count} consecutive wins`);
+  }
+  if (weekly.breakevenStreak >= 2) {
+    score += (Math.min(weekly.breakevenStreak, 6) / 6) * 15;
+    drivers.push(`${weekly.breakevenStreak} consecutive breakeven trades`);
+  }
+  if (weekly.trades > 0 && weekly.wins === 0 && weekly.losses > 0) {
+    drivers.push("No winning trades this week");
+  }
+  if (weekly.daysSinceLastTrade !== null && weekly.daysSinceLastTrade >= 4) {
+    const capped = Math.min(weekly.daysSinceLastTrade, 14);
+    score += ((capped - 3) / 11) * 10;
+    drivers.push(`${weekly.daysSinceLastTrade} days since last trade`);
+  }
+  if (weekly.trades >= 12) {
+    score += Math.min((weekly.trades - 12) / 10, 1) * 10;
+    drivers.push(`${weekly.trades} trades already logged this week`);
+  }
+  if (chess?.today && chess.today.played >= 3) {
+    const baseline = chess.avg30d ?? chess.avg7d;
+    if (baseline !== null) {
+      const gap = baseline - chess.today.winRate;
+      if (gap >= 15) {
+        score += (Math.min(gap, 40) / 40) * 10;
+        drivers.push("Below-baseline chess performance today");
+      }
+    }
+  }
+
+  return { score: Math.round(Math.max(0, Math.min(100, score))), drivers };
 }

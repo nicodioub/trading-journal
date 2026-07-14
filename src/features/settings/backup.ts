@@ -183,6 +183,101 @@ export function downloadBackup(data: BackupData): void {
   URL.revokeObjectURL(url);
 }
 
+/**
+ * Everything relevant to a date window, for feeding into an outside analysis
+ * tool (a spreadsheet, an LLM, ...). Unlike `BackupData` this isn't meant to
+ * be re-imported — it's a read-only snapshot scoped to `period`.
+ */
+export interface PeriodExportData {
+  version: 1;
+  exportedAt: string;
+  period: { from: string; to: string };
+  accounts: Account[];
+  trades: Trade[];
+  tradeNotes: TradeNote[];
+  tradeImages: TradeImage[];
+  journalEntries: JournalEntry[];
+  firstThoughts: FirstThought[];
+  mentalChecks: MentalCheck[];
+  chessStats: ChessStats[];
+  readinessRules: ReadinessRule[];
+  tradingRules: TradingRule[];
+}
+
+function dayOf(timestamp: string): string {
+  return timestamp.slice(0, 10);
+}
+
+function inRange(day: string, from: string, to: string): boolean {
+  return day >= from && day <= to;
+}
+
+/**
+ * Read every trade and "mind" record (journal, first thoughts, mental
+ * checks, chess, readiness windows) whose date falls within `from`..`to`
+ * (inclusive, `yyyy-MM-dd`), plus the accounts and standing rules for
+ * context. Meant for external analysis, not for re-import.
+ */
+export async function exportPeriodData(
+  repos: Repositories,
+  from: string,
+  to: string,
+): Promise<PeriodExportData> {
+  const accounts = await repos.accounts.list();
+  const trades = (await repos.trades.list()).filter((t) => inRange(dayOf(t.date), from, to));
+
+  const tradeImages: TradeImage[] = [];
+  const tradeNotes: TradeNote[] = [];
+  for (const trade of trades) {
+    tradeImages.push(...(await repos.tradeImages.listByTrade(trade.id)));
+    const note = await repos.tradeNotes.getByTrade(trade.id);
+    if (note) tradeNotes.push(note);
+  }
+
+  const [journalEntries, firstThoughts, mentalChecks, chessStats, readinessRules, tradingRules] =
+    await Promise.all([
+      repos.journalEntries.list(),
+      repos.firstThoughts.list(),
+      repos.mentalChecks.list(),
+      repos.chessStats.list(),
+      repos.readinessRules.list(),
+      repos.tradingRules.list(),
+    ]);
+
+  return {
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    period: { from, to },
+    accounts,
+    trades,
+    tradeNotes,
+    tradeImages,
+    journalEntries: journalEntries.filter((e) => inRange(dayOf(e.date), from, to)),
+    firstThoughts: firstThoughts.filter((t) => inRange(dayOf(t.date), from, to)),
+    mentalChecks: mentalChecks.filter((c) => inRange(dayOf(c.date), from, to)),
+    chessStats: chessStats.filter((c) => inRange(dayOf(c.date), from, to)),
+    readinessRules: readinessRules.filter(
+      (r) => dayOf(r.startDate) <= to && dayOf(r.endDate) >= from,
+    ),
+    tradingRules,
+  };
+}
+
+/** Trigger a browser/webview download of a period export JSON. */
+export function downloadPeriodExport(data: PeriodExportData): void {
+  const blob = new Blob([JSON.stringify(data, null, 2)], {
+    type: "application/json",
+  });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = `henledger-export-${data.period.from}_to_${data.period.to}.json`;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(url);
+}
+
 /** Minimal shape check before importing an untrusted file. */
 export function isBackupData(value: unknown): value is BackupData {
   const v = value as Partial<BackupData> | null;

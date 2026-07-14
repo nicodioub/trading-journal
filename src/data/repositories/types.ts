@@ -10,6 +10,8 @@ import type {
   JournalEntryInput,
   MentalCheck,
   MentalCheckInput,
+  PlanningObjective,
+  PlanningObjectiveInput,
   ReadinessRule,
   ReadinessRuleInput,
   Settings,
@@ -95,6 +97,13 @@ export interface ReadinessRuleRepository {
   delete(id: string): Promise<void>;
 }
 
+export interface PlanningObjectiveRepository {
+  getByAccount(accountId: string): Promise<PlanningObjective | null>;
+  /** Upsert — replaces any existing objective for the account. */
+  save(input: PlanningObjectiveInput): Promise<PlanningObjective>;
+  delete(accountId: string): Promise<void>;
+}
+
 export interface ChessStatsRepository {
   list(): Promise<ChessStats[]>;
   getByDate(date: string): Promise<ChessStats | null>;
@@ -144,6 +153,7 @@ export interface Repositories {
   mentalChecks: MentalCheckRepository;
   firstThoughts: FirstThoughtRepository;
   readinessRules: ReadinessRuleRepository;
+  planningObjectives: PlanningObjectiveRepository;
   chessStats: ChessStatsRepository;
   journalEntries: JournalEntryRepository;
   tradingRules: TradingRuleRepository;

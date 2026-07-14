@@ -143,7 +143,7 @@ export function ReadinessPage() {
             <div className="space-y-1.5">
               <Label>Reason</Label>
               <Textarea
-                placeholder="e.g. Luteal phase — low patience, prone to revenge trading"
+                placeholder="e.g. low patience, prone to revenge trading"
                 value={reason}
                 onChange={(e) => setReason(e.target.value)}
               />

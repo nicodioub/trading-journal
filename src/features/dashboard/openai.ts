@@ -1,10 +1,19 @@
-import type { Bias, ChessContext, PsychDimensions } from "@/domain";
+import type { Bias, ChessContext, PsychDimensions, PsychologicalLoad, WeeklyTradingContext } from "@/domain";
 
 const SYSTEM_PROMPT = `You are a trading psychologist — not a motivational coach. The trader gives you two things before their session:
 1. Their first thought of the day (one sentence, whatever came to mind first).
 2. A forced completion of "Today my job is ___".
 
 Sometimes you will also receive their "Cognitive Thermometer" data: today's chess win rate plus their 7-day and 30-day rolling baselines. Chess performance is used as objective, same-day evidence of cognitive sharpness, corroborating (or contradicting) what the writing suggests — never as a replacement for the written psychology.
+
+Sometimes you will also receive "This week's trading" — realized stats (trades, wins/losses/breakevens, net R, largest loss, current win/loss streak, breakeven streak, days since last trade) — and a deterministic "Psychological Load" index (0-100) with its drivers. Weight these three signals roughly: current writing ~50%, recent trading history ~30%, chess performance ~20%. Reason: the writing tells you what's happening right now; the trading history tells you WHY it may be happening (what the trader's brain has just been through); chess tells you whether their brain is sharp today, independent of markets. Do not let performance dominate the read — a trader who wrote a calm, process-focused check-in after a rough week is not automatically "at risk," and a trader riding a hot streak who wrote something process-focused is not automatically "fine" either.
+
+The weekly trading statistics and Psychological Load are context only — never assume a given number is intrinsically good or bad. Interpret how it may be shaping today's psychology given everything else you know:
+- A winning streak tends to raise overconfidence, outcome attachment, and FOMO, and lower selectivity — even when the writing sounds disciplined, note the elevated risk of complacency or oversized positions.
+- A losing streak tends to raise hesitation, fear of pulling the trigger, and the urge to "make it back" — even when the writing appears process-focused, that framing can mask an unconscious pull toward revenge trading.
+- A breakeven streak tends to raise frustration and the temptation to widen stops or force trades.
+- Several days without trading can mean either healthy patience or rust/anxiety about re-entering — use the writing to disambiguate.
+- A high Psychological Load with calm, disciplined writing is not a contradiction to resolve away — name both: the mind may be under more strain than the writing lets on, and that's worth flagging gently, not alarmingly.
 
 Analyze the PSYCHOLOGY behind the wording, never keyword-match. The same word can be healthy or dangerous depending on context — e.g. "Today's success doesn't matter, my job is execution" is healthy; "Today I'm going to prove I'm the best trader" is dangerous, even though neither contains an obviously bad word. Read intent, not vocabulary.
 
@@ -34,7 +43,7 @@ Write the explanation like a psychologist assessing a patient, not a coach cheer
 "Your wording suggests that avoiding losses has become today's objective. When preventing losses becomes the objective, traders often hesitate on valid setups, move stops prematurely, or skip trades entirely. Your plan should define success—not today's PnL."
 Write 2-4 sentences in this style, tailored to what THIS trader actually wrote — never generic, never a bare verdict like "NO TRADE".
 
-If chess data was provided, also weigh it into the explanation as corroborating (or contradicting) evidence: e.g. "Your written mindset appears disciplined, but today's chess performance is well below your normal level, which has historically preceded hesitation and execution errors — be especially selective with entries." Put this combined read in a separate "aiObservations" field (2-3 sentences), referencing both the written signal and the chess baseline explicitly. Leave aiObservations as an empty string if no chess data was provided.
+If chess data and/or weekly trading data was provided, weigh it into the explanation as corroborating (or contradicting) evidence: e.g. "Your written mindset appears disciplined, but today's chess performance is well below your normal level, which has historically preceded hesitation and execution errors — be especially selective with entries." or "Your writing sounds process-focused, but you're on a two-loss streak with elevated Psychological Load — watch for an unconscious urge to force a trade to feel back in control." Put this combined read in a separate "aiObservations" field (2-3 sentences), referencing the written signal plus whichever of the chess baseline / weekly trading context / psychological load actually informed the read. Leave aiObservations as an empty string if neither chess nor weekly trading data was provided.
 
 Also write a "primaryFocus": exactly one sentence naming the single most salient thing for today, prefixed with either "Primary risk today:" or "Primary opportunity today:" depending on which is more relevant. Example: "Primary risk today: Becoming complacent after early profits." or "Primary opportunity today: Your mindset appears well aligned with disciplined execution."
 
@@ -115,6 +124,27 @@ function describeChessContext(chess: ChessContext | null): string | null {
   return parts.join("\n");
 }
 
+function describeWeeklyContext(
+  weekly: WeeklyTradingContext | null,
+  load: PsychologicalLoad | null,
+): string | null {
+  if (!weekly || weekly.trades === 0) return null;
+  const parts = [
+    `Week of ${weekly.weekStart} to ${weekly.weekEnd}: ${weekly.trades} trades (${weekly.wins}W-${weekly.losses}L-${weekly.breakevens}BE, ${weekly.winRate.toFixed(0)}% win rate)`,
+    `Net PnL this week: ${weekly.netPnl.toFixed(2)}${weekly.netR !== null ? `, net R: ${weekly.netR.toFixed(2)}` : ""}`,
+  ];
+  if (weekly.largestLoss !== null) parts.push(`Largest loss this week: ${weekly.largestLoss.toFixed(2)}`);
+  if (weekly.currentStreak.type !== "none") {
+    parts.push(`Current streak: ${weekly.currentStreak.count} consecutive ${weekly.currentStreak.type}${weekly.currentStreak.count > 1 ? "s" : ""}`);
+  }
+  if (weekly.breakevenStreak >= 2) parts.push(`Current breakeven streak: ${weekly.breakevenStreak}`);
+  if (weekly.daysSinceLastTrade !== null) parts.push(`Days since last trade: ${weekly.daysSinceLastTrade}`);
+  if (load) {
+    parts.push(`Psychological Load: ${load.score}/100${load.drivers.length ? ` (drivers: ${load.drivers.join(", ")})` : ""}`);
+  }
+  return parts.join("\n");
+}
+
 /**
  * Sends the trader's first thought + job statement (and optionally today's
  * Cognitive Thermometer data) to GPT-4o for a full psychological breakdown.
@@ -127,12 +157,16 @@ export async function analyzeFirstThought(
   jobStatement: string,
   apiKey: string,
   chess: ChessContext | null = null,
+  weekly: WeeklyTradingContext | null = null,
+  psychLoad: PsychologicalLoad | null = null,
 ): Promise<FirstThoughtAnalysis> {
   const chessBlock = describeChessContext(chess);
+  const weeklyBlock = describeWeeklyContext(weekly, psychLoad);
   const userContent = [
     `First thought: "${thought}"`,
     `Today my job is: "${jobStatement}"`,
     chessBlock ? `Cognitive Thermometer:\n${chessBlock}` : null,
+    weeklyBlock ? `This week's trading:\n${weeklyBlock}` : null,
   ]
     .filter(Boolean)
     .join("\n");

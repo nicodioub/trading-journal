@@ -6,6 +6,7 @@ import {
   getOutcome,
   journalEntrySchema,
   mentalCheckSchema,
+  planningObjectiveSchema,
   readinessRuleSchema,
   settingsSchema,
   tradeImageSchema,
@@ -17,6 +18,7 @@ import {
   type FirstThought,
   type JournalEntry,
   type MentalCheck,
+  type PlanningObjective,
   type ReadinessRule,
   type Settings,
   type Trade,
@@ -31,6 +33,7 @@ import type {
   FirstThoughtRepository,
   JournalEntryRepository,
   MentalCheckRepository,
+  PlanningObjectiveRepository,
   ReadinessRuleRepository,
   Repositories,
   SettingsRepository,
@@ -526,6 +529,97 @@ const mentalCheckRepository: MentalCheckRepository = {
 };
 
 /* ------------------------------------------------------------------ *
+ * Planning objectives (one per account)
+ * ------------------------------------------------------------------ */
+
+interface PlanningObjectiveRow {
+  id: string;
+  account_id: string;
+  start_balance: number;
+  weekly_growth_percent: number;
+  weeks: number;
+  start_date: string;
+  created_at: string;
+  updated_at: string;
+}
+
+function rowToPlanningObjective(row: PlanningObjectiveRow): PlanningObjective {
+  return planningObjectiveSchema.parse({
+    id: row.id,
+    accountId: row.account_id,
+    startBalance: row.start_balance,
+    weeklyGrowthPercent: row.weekly_growth_percent,
+    weeks: row.weeks,
+    startDate: row.start_date,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  });
+}
+
+const planningObjectiveRepository: PlanningObjectiveRepository = {
+  async getByAccount(accountId) {
+    const db = await getDb();
+    const rows = await db.select<PlanningObjectiveRow[]>(
+      "SELECT * FROM planning_objectives WHERE account_id = $1",
+      [accountId],
+    );
+    return rows[0] ? rowToPlanningObjective(rows[0]) : null;
+  },
+
+  async save(input) {
+    const db = await getDb();
+    const existing = await this.getByAccount(input.accountId);
+    if (existing) {
+      const updated = planningObjectiveSchema.parse({
+        ...existing,
+        ...input,
+        updatedAt: nowIso(),
+      });
+      await db.execute(
+        `UPDATE planning_objectives SET start_balance=$2, weekly_growth_percent=$3,
+          weeks=$4, start_date=$5, updated_at=$6 WHERE account_id=$1`,
+        [
+          updated.accountId,
+          updated.startBalance,
+          updated.weeklyGrowthPercent,
+          updated.weeks,
+          updated.startDate,
+          updated.updatedAt,
+        ],
+      );
+      return updated;
+    }
+    const objective = planningObjectiveSchema.parse({
+      ...input,
+      id: createId(),
+      createdAt: nowIso(),
+      updatedAt: nowIso(),
+    });
+    await db.execute(
+      `INSERT INTO planning_objectives
+        (id, account_id, start_balance, weekly_growth_percent, weeks, start_date, created_at, updated_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
+      [
+        objective.id,
+        objective.accountId,
+        objective.startBalance,
+        objective.weeklyGrowthPercent,
+        objective.weeks,
+        objective.startDate,
+        objective.createdAt,
+        objective.updatedAt,
+      ],
+    );
+    return objective;
+  },
+
+  async delete(accountId) {
+    const db = await getDb();
+    await db.execute("DELETE FROM planning_objectives WHERE account_id = $1", [accountId]);
+  },
+};
+
+/* ------------------------------------------------------------------ *
  * First thoughts (one per day)
  * ------------------------------------------------------------------ */
 
@@ -549,6 +643,8 @@ interface FirstThoughtRow {
   suggested_action: string;
   ai_observations: string;
   chess_context: string;
+  weekly_context: string;
+  psychological_load: string;
   created_at: string;
 }
 
@@ -573,6 +669,8 @@ function rowToFirstThought(row: FirstThoughtRow): FirstThought {
     suggestedAction: row.suggested_action,
     aiObservations: row.ai_observations,
     chessContext: JSON.parse(row.chess_context),
+    weeklyContext: JSON.parse(row.weekly_context),
+    psychologicalLoad: JSON.parse(row.psychological_load),
     createdAt: row.created_at,
   });
 }
@@ -603,12 +701,14 @@ const firstThoughtRepository: FirstThoughtRepository = {
     const strengthsJson = JSON.stringify(input.strengths ?? []);
     const likelyBehaviorsJson = JSON.stringify(input.likelyBehaviors ?? []);
     const chessContextJson = JSON.stringify(input.chessContext ?? null);
+    const weeklyContextJson = JSON.stringify(input.weeklyContext ?? null);
+    const psychologicalLoadJson = JSON.stringify(input.psychologicalLoad ?? null);
     if (existing) {
       await db.execute(
         `UPDATE first_thoughts SET thought=$2, job_statement=$3, dimensions=$4,
           readiness_score=$5, status=$6, alignment_score=$7, confidence_score=$8, primary_focus=$9,
           explanation=$10, biases=$11, strengths=$12, likely_behaviors=$13, reframe=$14, mission=$15,
-          suggested_action=$16, ai_observations=$17, chess_context=$18
+          suggested_action=$16, ai_observations=$17, chess_context=$18, weekly_context=$19, psychological_load=$20
           WHERE date=$1`,
         [
           input.date,
@@ -629,6 +729,8 @@ const firstThoughtRepository: FirstThoughtRepository = {
           input.suggestedAction ?? "",
           input.aiObservations ?? "",
           chessContextJson,
+          weeklyContextJson,
+          psychologicalLoadJson,
         ],
       );
       return { ...existing, ...input };
@@ -642,8 +744,8 @@ const firstThoughtRepository: FirstThoughtRepository = {
       `INSERT INTO first_thoughts
         (id, date, thought, job_statement, dimensions, readiness_score, status, alignment_score,
          confidence_score, primary_focus, explanation, biases, strengths, likely_behaviors, reframe,
-         mission, suggested_action, ai_observations, chess_context, created_at)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)`,
+         mission, suggested_action, ai_observations, chess_context, weekly_context, psychological_load, created_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22)`,
       [
         check.id,
         check.date,
@@ -664,6 +766,8 @@ const firstThoughtRepository: FirstThoughtRepository = {
         check.suggestedAction,
         check.aiObservations,
         JSON.stringify(check.chessContext),
+        JSON.stringify(check.weeklyContext),
+        JSON.stringify(check.psychologicalLoad),
         check.createdAt,
       ],
     );
@@ -1030,6 +1134,7 @@ async function resetDatabase(): Promise<void> {
     "mental_checks",
     "first_thoughts",
     "readiness_rules",
+    "planning_objectives",
     "chess_stats",
     "journal_entries",
     "trading_rules",
@@ -1049,6 +1154,7 @@ export function createSqliteRepositories(): Repositories {
     mentalChecks: mentalCheckRepository,
     firstThoughts: firstThoughtRepository,
     readinessRules: readinessRuleRepository,
+    planningObjectives: planningObjectiveRepository,
     chessStats: chessStatsRepository,
     journalEntries: journalEntryRepository,
     tradingRules: tradingRuleRepository,

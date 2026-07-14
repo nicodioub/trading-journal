@@ -62,6 +62,43 @@ export const chessContextSnapshotSchema = z
 export type ChessContextSnapshot = z.infer<typeof chessContextSnapshotSchema>;
 
 /**
+ * Snapshot of this week's realized trading performance sent to the model at
+ * analysis time — same rationale as chessContextSnapshotSchema: stored, not
+ * recomputed later, so the UI can truthfully show what evidence informed a
+ * given day's assessment.
+ */
+export const weeklyContextSnapshotSchema = z
+  .object({
+    weekStart: z.string(),
+    weekEnd: z.string(),
+    trades: z.number(),
+    wins: z.number(),
+    losses: z.number(),
+    breakevens: z.number(),
+    winRate: z.number(),
+    netR: z.number().nullable(),
+    netPnl: z.number(),
+    largestLoss: z.number().nullable(),
+    currentStreak: z.object({
+      type: z.enum(["win", "loss", "none"]),
+      count: z.number(),
+    }),
+    breakevenStreak: z.number(),
+    daysSinceLastTrade: z.number().nullable(),
+  })
+  .nullable();
+export type WeeklyContextSnapshot = z.infer<typeof weeklyContextSnapshotSchema>;
+
+/** Deterministic 0-100 "psychological load" index and its active drivers, computed alongside the weekly context. */
+export const psychologicalLoadSnapshotSchema = z
+  .object({
+    score: z.number().min(0).max(100),
+    drivers: z.array(z.string()),
+  })
+  .nullable();
+export type PsychologicalLoadSnapshot = z.infer<typeof psychologicalLoadSnapshotSchema>;
+
+/**
  * Daily "first thought" check-in — a free-form first thought plus a forced
  * "today my job is ___" completion, analyzed by an LLM into psychological
  * dimensions and rolled up into a single Trading Readiness score (0-100).
@@ -96,6 +133,10 @@ export const firstThoughtSchema = z.object({
   aiObservations: z.string().default(""),
   /** Exact chess data sent to the model, or null if none was available at analysis time. */
   chessContext: chessContextSnapshotSchema.default(null),
+  /** Exact weekly trading performance data sent to the model, or null if no closed trades existed yet. */
+  weeklyContext: weeklyContextSnapshotSchema.default(null),
+  /** Deterministic psychological load index derived from the weekly context, or null if not computed. */
+  psychologicalLoad: psychologicalLoadSnapshotSchema.default(null),
   createdAt: timestampSchema,
 });
 export type FirstThought = z.infer<typeof firstThoughtSchema>;

@@ -29,7 +29,9 @@ import { isTauri, useRepositories, useSettings, useUpdateSettings } from "@/data
 import type { Theme } from "@/domain";
 import {
   downloadBackup,
+  downloadPeriodExport,
   exportData,
+  exportPeriodData,
   importData,
   isBackupData,
   type BackupData,
@@ -52,6 +54,11 @@ export function SettingsPage() {
   const [pendingImport, setPendingImport] = useState<BackupData | null>(null);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+
+  const today = new Date().toISOString().slice(0, 10);
+  const monthAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  const [periodFrom, setPeriodFrom] = useState(monthAgo);
+  const [periodTo, setPeriodTo] = useState(today);
 
   useEffect(() => {
     if (settings) {
@@ -77,6 +84,15 @@ export function SettingsPage() {
   const handleExport = async () => {
     downloadBackup(await exportData(repos));
     setMessage("Backup exported.");
+  };
+
+  const handlePeriodExport = async () => {
+    if (periodFrom > periodTo) {
+      setMessage("The start date must be before the end date.");
+      return;
+    }
+    downloadPeriodExport(await exportPeriodData(repos, periodFrom, periodTo));
+    setMessage("Period export downloaded.");
   };
 
   const handleFile = async (file: File | undefined) => {
@@ -258,6 +274,43 @@ export function SettingsPage() {
               notes, mental checks and chess stats are.
             </p>
             {message && <p className="text-xs text-success">{message}</p>}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Export for analysis</CardTitle>
+            <CardDescription>
+              Every trade and "mind" record (journal, first thoughts, mental checks,
+              chess, readiness windows) in a date range, bundled into one JSON file
+              you can hand to a spreadsheet or an AI for analysis.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="flex flex-wrap items-end gap-3">
+              <div className="space-y-1.5">
+                <Label htmlFor="period-from">From</Label>
+                <Input
+                  id="period-from"
+                  type="date"
+                  value={periodFrom}
+                  onChange={(e) => setPeriodFrom(e.target.value)}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="period-to">To</Label>
+                <Input
+                  id="period-to"
+                  type="date"
+                  value={periodTo}
+                  onChange={(e) => setPeriodTo(e.target.value)}
+                />
+              </div>
+              <Button variant="secondary" onClick={handlePeriodExport}>
+                <Download className="h-4 w-4" />
+                Export period
+              </Button>
+            </div>
           </CardContent>
         </Card>
 

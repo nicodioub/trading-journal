@@ -7,6 +7,7 @@ import {
   getOutcome,
   journalEntrySchema,
   mentalCheckSchema,
+  planningObjectiveSchema,
   readinessRuleSchema,
   settingsSchema,
   tradeImageSchema,
@@ -18,6 +19,7 @@ import {
   type FirstThought,
   type JournalEntry,
   type MentalCheck,
+  type PlanningObjective,
   type ReadinessRule,
   type Settings,
   type Trade,
@@ -49,6 +51,7 @@ interface Snapshot {
   mentalChecks: MentalCheck[];
   firstThoughts: FirstThought[];
   readinessRules: ReadinessRule[];
+  planningObjectives: PlanningObjective[];
   chessStats: ChessStats[];
   journalEntries: JournalEntry[];
   tradingRules: TradingRule[];
@@ -67,6 +70,7 @@ class MemoryStore {
   mentalChecks: MentalCheck[] = [];
   firstThoughts: FirstThought[] = [];
   readinessRules: ReadinessRule[] = [];
+  planningObjectives: PlanningObjective[] = [];
   chessStats: ChessStats[] = [];
   journalEntries: JournalEntry[] = [];
   tradingRules: TradingRule[] = [];
@@ -103,6 +107,7 @@ class MemoryStore {
       mentalChecks: this.mentalChecks,
       firstThoughts: this.firstThoughts,
       readinessRules: this.readinessRules,
+      planningObjectives: this.planningObjectives,
       chessStats: this.chessStats,
       journalEntries: this.journalEntries,
       tradingRules: this.tradingRules,
@@ -172,6 +177,7 @@ export function createMemoryRepositories(): Repositories {
       async delete(id) {
         store.accounts = store.accounts.filter((a) => a.id !== id);
         store.trades = store.trades.filter((t) => t.accountId !== id);
+        store.planningObjectives = store.planningObjectives.filter((p) => p.accountId !== id);
         store.persist();
       },
     },
@@ -345,6 +351,42 @@ export function createMemoryRepositories(): Repositories {
       },
     },
 
+    planningObjectives: {
+      async getByAccount(accountId) {
+        return store.planningObjectives.find((p) => p.accountId === accountId) ?? null;
+      },
+      async save(input) {
+        const existing = store.planningObjectives.find((p) => p.accountId === input.accountId);
+        if (existing) {
+          const updated = planningObjectiveSchema.parse({
+            ...existing,
+            ...input,
+            updatedAt: nowIso(),
+          });
+          store.planningObjectives = store.planningObjectives.map((p) =>
+            p.accountId === input.accountId ? updated : p,
+          );
+          store.persist();
+          return updated;
+        }
+        const objective = planningObjectiveSchema.parse({
+          ...input,
+          id: createId(),
+          createdAt: nowIso(),
+          updatedAt: nowIso(),
+        });
+        store.planningObjectives.push(objective);
+        store.persist();
+        return objective;
+      },
+      async delete(accountId) {
+        store.planningObjectives = store.planningObjectives.filter(
+          (p) => p.accountId !== accountId,
+        );
+        store.persist();
+      },
+    },
+
     chessStats: {
       async list() {
         return [...store.chessStats].sort((a, b) => b.date.localeCompare(a.date));
@@ -455,6 +497,7 @@ export function createMemoryRepositories(): Repositories {
       store.mentalChecks = [];
       store.firstThoughts = [];
       store.readinessRules = [];
+      store.planningObjectives = [];
       store.chessStats = [];
       store.journalEntries = [];
       store.tradingRules = [];

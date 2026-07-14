@@ -20,6 +20,16 @@ export function formatCurrency(
 }
 
 export function formatPercent(value: number, digits = 1): string {
+  if (!Number.isFinite(value)) return "—";
+  // Compounding projections can produce astronomically large percentages;
+  // switch to compact notation (e.g. "3.36B%") instead of an unreadable
+  // wall of digits.
+  if (Math.abs(value) >= 1_000) {
+    return `${new Intl.NumberFormat("en-US", {
+      notation: "compact",
+      maximumFractionDigits: 2,
+    }).format(value)}%`;
+  }
   return `${value.toFixed(digits)}%`;
 }
 

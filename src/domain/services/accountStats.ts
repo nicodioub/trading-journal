@@ -1,4 +1,6 @@
+import { endOfWeek, startOfWeek } from "date-fns";
 import type { Account, Trade } from "../models";
+import { tradeTime } from "./tradeStats";
 import {
   buildEquityCurve,
   computePerformanceStats,
@@ -63,4 +65,51 @@ function computeDrawdown(curve: EquityPoint[]): {
     peak > 0 && last ? ((peak - last.balance) / peak) * 100 : 0;
 
   return { currentDrawdownPct, maxDrawdownPct };
+}
+
+export interface WeeklyAccountStat {
+  weekStart: string; // ISO date, Monday
+  weekEnd: string; // ISO date, Sunday
+  /** Account balance at the start of this week (Monday 00:00). */
+  startBalance: number;
+  /** Account balance right now. */
+  currentBalance: number;
+  pnl: number;
+  /** Change over the week, relative to Monday's starting balance. */
+  returnPct: number;
+}
+
+/**
+ * How much this account grew (or shrank) this calendar week, Monday to
+ * Sunday — the trader's own "how's my week going" number, distinct from the
+ * all-time return shown elsewhere.
+ */
+export function computeWeeklyAccountStat(
+  account: Account,
+  trades: Trade[],
+  referenceDate: Date = new Date(),
+): WeeklyAccountStat {
+  const weekStart = startOfWeek(referenceDate, { weekStartsOn: 1 });
+  const weekEnd = endOfWeek(referenceDate, { weekStartsOn: 1 });
+
+  const closed = trades.filter((t) => t.status === "closed");
+  const before = closed.filter((t) => tradeTime(t) < weekStart.getTime());
+  const during = closed.filter(
+    (t) => tradeTime(t) >= weekStart.getTime() && tradeTime(t) <= weekEnd.getTime(),
+  );
+
+  const startBalance =
+    account.initialCapital + before.reduce((sum, t) => sum + (t.resultAmount ?? 0), 0);
+  const pnl = during.reduce((sum, t) => sum + (t.resultAmount ?? 0), 0);
+  const currentBalance = startBalance + pnl;
+  const returnPct = startBalance !== 0 ? (pnl / startBalance) * 100 : 0;
+
+  return {
+    weekStart: weekStart.toISOString().slice(0, 10),
+    weekEnd: weekEnd.toISOString().slice(0, 10),
+    startBalance,
+    currentBalance,
+    pnl,
+    returnPct,
+  };
 }

@@ -9,6 +9,7 @@ import type {
   FirstThoughtInput,
   JournalEntryInput,
   MentalCheckInput,
+  PlanningObjectiveInput,
   ReadinessRuleInput,
   Settings,
   TradeImageInput,
@@ -32,6 +33,7 @@ export const queryKeys = {
   firstThought: (date: string) => ["firstThought", date] as const,
   readinessRules: ["readinessRules"] as const,
   readinessRuleForDate: (date: string) => ["readinessRule", date] as const,
+  planningObjective: (accountId: string) => ["planningObjective", accountId] as const,
   chessStats: ["chessStats"] as const,
   chessStatsLatest: ["chessStats", "latest"] as const,
   journalEntries: ["journalEntries"] as const,
@@ -292,6 +294,37 @@ export function useDeleteReadinessRule() {
   return useMutation({
     mutationFn: (id: string) => repos.readinessRules.delete(id),
     onSuccess: () => invalidateReadinessQueries(qc),
+  });
+}
+
+/* ------------------------ Planning objectives ------------------------ */
+
+export function usePlanningObjective(accountId: string | undefined) {
+  const repos = useRepositories();
+  return useQuery({
+    queryKey: queryKeys.planningObjective(accountId ?? ""),
+    queryFn: () => repos.planningObjectives.getByAccount(accountId as string),
+    enabled: Boolean(accountId),
+  });
+}
+
+export function useSavePlanningObjective() {
+  const repos = useRepositories();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: PlanningObjectiveInput) => repos.planningObjectives.save(input),
+    onSuccess: (objective) =>
+      qc.invalidateQueries({ queryKey: queryKeys.planningObjective(objective.accountId) }),
+  });
+}
+
+export function useDeletePlanningObjective() {
+  const repos = useRepositories();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (accountId: string) => repos.planningObjectives.delete(accountId),
+    onSuccess: (_data, accountId) =>
+      qc.invalidateQueries({ queryKey: queryKeys.planningObjective(accountId) }),
   });
 }
 

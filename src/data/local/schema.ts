@@ -179,4 +179,26 @@ export const MIGRATIONS: Migration[] = [
       );`,
     ],
   },
+  {
+    version: 5,
+    statements: [
+      `ALTER TABLE first_thoughts ADD COLUMN weekly_context TEXT NOT NULL DEFAULT 'null';`,
+      `ALTER TABLE first_thoughts ADD COLUMN psychological_load TEXT NOT NULL DEFAULT 'null';`,
+    ],
+  },
+  {
+    version: 6,
+    statements: [
+      `CREATE TABLE IF NOT EXISTS planning_objectives (
+        id TEXT PRIMARY KEY,
+        account_id TEXT NOT NULL UNIQUE REFERENCES accounts(id) ON DELETE CASCADE,
+        start_balance REAL NOT NULL,
+        weekly_growth_percent REAL NOT NULL,
+        weeks INTEGER NOT NULL,
+        start_date TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );`,
+    ],
+  },
 ];

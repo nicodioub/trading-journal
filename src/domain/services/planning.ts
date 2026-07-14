@@ -1,4 +1,5 @@
 import { addWeeks } from "date-fns";
+import type { EquityPoint } from "./statistics";
 
 export interface PlanWeek {
   week: number;
@@ -48,4 +49,45 @@ export function buildWeeklyPlan(
   }
 
   return rows;
+}
+
+export interface PlanProgressRow extends PlanWeek {
+  /** Real account balance as of this week's date; null for weeks not yet reached. */
+  actualBalance: number | null;
+  /** How far actual balance is from the target, as a percent of the target (positive = ahead). */
+  aheadPercent: number | null;
+}
+
+/**
+ * Overlays a saved plan with the account's real equity curve, so each past
+ * week shows target vs. actual and future weeks stay as pure targets.
+ */
+export function computePlanProgress(
+  plan: PlanWeek[],
+  equityCurve: EquityPoint[],
+  now: Date = new Date(),
+): PlanProgressRow[] {
+  const sorted = [...equityCurve].sort(
+    (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime(),
+  );
+
+  return plan.map((row) => {
+    if (row.date > now || sorted.length === 0) {
+      return { ...row, actualBalance: null, aheadPercent: null };
+    }
+
+    let actualBalance = sorted[0].balance;
+    for (const point of sorted) {
+      if (new Date(point.date).getTime() <= row.date.getTime()) {
+        actualBalance = point.balance;
+      } else {
+        break;
+      }
+    }
+
+    const aheadPercent =
+      row.balance !== 0 ? ((actualBalance - row.balance) / row.balance) * 100 : null;
+
+    return { ...row, actualBalance, aheadPercent };
+  });
 }

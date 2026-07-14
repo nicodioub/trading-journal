@@ -8,7 +8,7 @@ import {
   EmptyState,
 } from "@/components/ui";
 import { useAccounts, useTrades } from "@/data";
-import { computePerformanceStats } from "@/domain";
+import { computePerformanceStats, computeWeeklyAccountStat } from "@/domain";
 import { formatCurrency, formatSignedPercent } from "@/lib/format";
 
 export function AccountBalancesWidget() {
@@ -37,6 +37,7 @@ export function AccountBalancesWidget() {
                 account.initialCapital > 0
                   ? (totalPnl / account.initialCapital) * 100
                   : 0;
+              const weekly = computeWeeklyAccountStat(account, accountTrades);
               return (
                 <Link
                   key={account.id}
@@ -61,6 +62,16 @@ export function AccountBalancesWidget() {
                     >
                       {formatSignedPercent(returnPct)}
                     </div>
+                    {weekly.pnl !== 0 && (
+                      <div
+                        className={
+                          "text-[11px] tabular-nums text-muted-foreground " +
+                          (weekly.pnl >= 0 ? "text-success/80" : "text-danger/80")
+                        }
+                      >
+                        This week {formatSignedPercent(weekly.returnPct)}
+                      </div>
+                    )}
                   </div>
                 </Link>
               );
