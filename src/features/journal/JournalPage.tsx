@@ -1,5 +1,5 @@
 import { format } from "date-fns";
-import { NotebookPen, Trash2 } from "lucide-react";
+import { NotebookPen, Pencil, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { PageHeader } from "@/components/layout";
 import {
@@ -15,6 +15,7 @@ import {
   useCreateJournalEntry,
   useDeleteJournalEntry,
   useJournalEntries,
+  useUpdateJournalEntry,
 } from "@/data";
 
 function todayIso(): string {
@@ -24,10 +25,14 @@ function todayIso(): string {
 export function JournalPage() {
   const { data: entries = [] } = useJournalEntries();
   const createEntry = useCreateJournalEntry();
+  const updateEntry = useUpdateJournalEntry();
   const deleteEntry = useDeleteJournalEntry();
   const [date, setDate] = useState(todayIso());
   const [content, setContent] = useState("");
   const [saving, setSaving] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editDate, setEditDate] = useState("");
+  const [editContent, setEditContent] = useState("");
 
   const handleAdd = async () => {
     const trimmed = content.trim();
@@ -39,6 +44,29 @@ export function JournalPage() {
     } finally {
       setSaving(false);
     }
+  };
+
+  const startEditing = (entry: (typeof entries)[number]) => {
+    setEditingId(entry.id);
+    setEditDate(entry.date);
+    setEditContent(entry.content);
+  };
+
+  const cancelEditing = () => {
+    setEditingId(null);
+    setEditDate("");
+    setEditContent("");
+  };
+
+  const handleUpdate = async () => {
+    const trimmed = editContent.trim();
+    if (!editingId || !editDate || !trimmed) return;
+
+    await updateEntry.mutateAsync({
+      id: editingId,
+      patch: { date: editDate, content: trimmed },
+    });
+    cancelEditing();
   };
 
   return (
@@ -79,22 +107,81 @@ export function JournalPage() {
             {entries.map((entry) => (
               <Card key={entry.id}>
                 <CardContent className="space-y-2 pt-6">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                      {format(new Date(entry.date), "dd MMM yyyy")}
-                    </span>
-                    <ConfirmDialog
-                      trigger={
-                        <Button variant="ghost" size="icon">
-                          <Trash2 className="h-4 w-4" />
+                  {editingId === entry.id ? (
+                    <>
+                      <div className="w-40">
+                        <Input
+                          type="date"
+                          aria-label="Entry date"
+                          value={editDate}
+                          onChange={(e) => setEditDate(e.target.value)}
+                        />
+                      </div>
+                      <Textarea
+                        aria-label="Entry content"
+                        value={editContent}
+                        onChange={(e) => setEditContent(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+                            e.preventDefault();
+                            void handleUpdate();
+                          }
+                        }}
+                        className="min-h-[120px]"
+                        autoFocus
+                      />
+                      <div className="flex justify-end gap-2">
+                        <Button
+                          variant="ghost"
+                          onClick={cancelEditing}
+                          disabled={updateEntry.isPending}
+                        >
+                          Cancel
                         </Button>
-                      }
-                      title="Delete this entry?"
-                      description="This can't be undone."
-                      onConfirm={() => deleteEntry.mutateAsync(entry.id)}
-                    />
-                  </div>
-                  <p className="whitespace-pre-wrap text-sm">{entry.content}</p>
+                        <Button
+                          onClick={handleUpdate}
+                          disabled={updateEntry.isPending || !editDate || !editContent.trim()}
+                        >
+                          {updateEntry.isPending ? "Saving…" : "Save changes"}
+                        </Button>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                          {format(new Date(entry.date), "dd MMM yyyy")}
+                        </span>
+                        <div className="flex items-center">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            aria-label="Edit journal entry"
+                            title="Edit entry"
+                            onClick={() => startEditing(entry)}
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <ConfirmDialog
+                            trigger={
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                aria-label="Delete journal entry"
+                                title="Delete entry"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            }
+                            title="Delete this entry?"
+                            description="This can't be undone."
+                            onConfirm={() => deleteEntry.mutateAsync(entry.id)}
+                          />
+                        </div>
+                      </div>
+                      <p className="whitespace-pre-wrap text-sm">{entry.content}</p>
+                    </>
+                  )}
                 </CardContent>
               </Card>
             ))}
