@@ -71,6 +71,24 @@ pnpm typecheck
 > First `pnpm tauri:dev` compiles the Rust dependencies and can take several
 > minutes. Subsequent runs are fast.
 
+## Installing
+
+`pnpm tauri:build` produces a native installer under
+`src-tauri/target/release/bundle/` (`msi/` and `nsis/` on Windows, `dmg/` on
+macOS, `deb/`/`appimage/` on Linux). To install:
+
+1. Run `pnpm tauri:build`.
+2. Open the bundle folder for your platform and run the installer
+   (e.g. the `.msi` or `.exe` on Windows).
+3. On Windows, the installer isn't code-signed, so SmartScreen may warn about
+   an unrecognized app — choose "More info" → "Run anyway" to proceed.
+4. Windows needs the WebView2 runtime, which ships with Windows 10/11 by
+   default; if missing, Tauri's installer prompts to fetch it automatically.
+
+The app is fully offline and stores its SQLite database and trade
+screenshots locally, so no account or network setup is required after
+install.
+
 ## MVP scope
 
 Implemented: Dashboard (daily mental check + chess cognitive thermometer +
