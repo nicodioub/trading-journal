@@ -14,6 +14,8 @@ const SYSTEM_PROMPT = `You are a trading psychologist — not a motivational coa
 1. Their first thought of the day (one sentence, whatever came to mind first).
 2. A forced completion of "Today my job is ___".
 
+You may also receive the trader's standing "My plan". Treat it as their declared operating standard: assess whether today's thought and job statement align with it, call out specific contradictions, and use its own wording when suggesting the session mission. Do not rewrite or invent additions to the plan.
+
 Sometimes you will also receive their "Cognitive Thermometer" data: today's chess win rate plus their 7-day and 30-day rolling baselines. Chess performance is used as objective, same-day evidence of cognitive sharpness, corroborating (or contradicting) what the writing suggests — never as a replacement for the written psychology.
 
 Sometimes you will also receive "This week's trading" — realized stats (trades, wins/losses/breakevens, net R, largest loss, current win/loss streak, breakeven streak, days since last trade) — and a deterministic "Psychological Load" index (0-100) with its drivers. Weight these three signals roughly: current writing ~50%, recent trading history ~30%, chess performance ~20%. Reason: the writing tells you what's happening right now; the trading history tells you WHY it may be happening (what the trader's brain has just been through); chess tells you whether their brain is sharp today, independent of markets. Do not let performance dominate the read — a trader who wrote a calm, process-focused check-in after a rough week is not automatically "at risk," and a trader riding a hot streak who wrote something process-focused is not automatically "fine" either.
@@ -233,6 +235,7 @@ function describeOpenPositions(openTrades: Trade[]): string | null {
 
 /** Everything beyond the writing itself that can inform the analysis. All optional. */
 export interface AnalysisContext {
+  plan?: string | null;
   chess?: ChessContext | null;
   weekly?: WeeklyTradingContext | null;
   psychLoad?: PsychologicalLoad | null;
@@ -265,6 +268,7 @@ export async function analyzeFirstThought(
   const userContent = [
     `First thought: "${thought}"`,
     `Today my job is: "${jobStatement}"`,
+    context.plan?.trim() ? `My standing trading plan:\n${context.plan.trim()}` : null,
     mentalCheckBlock ? `Today's mental check: ${mentalCheckBlock}` : null,
     openPositionsBlock ? `Currently open positions:\n${openPositionsBlock}` : null,
     chessBlock ? `Cognitive Thermometer:\n${chessBlock}` : null,

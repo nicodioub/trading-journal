@@ -8,6 +8,7 @@ import { formatCurrency, formatPercent, formatSignedPercent } from "@/lib/format
 import { AccountBalancesWidget } from "./components/AccountBalancesWidget";
 import { ChessThermometerCard } from "./components/ChessThermometerCard";
 import { FirstThoughtCard } from "./components/FirstThoughtCard";
+import { MyPlanCard } from "./components/MyPlanCard";
 import { RecentTradesWidget } from "./components/RecentTradesWidget";
 
 export function DashboardPage() {
@@ -55,7 +56,8 @@ export function DashboardPage() {
 
       {/* Check-in + cognitive thermometer */}
       <div className="grid gap-6 lg:grid-cols-3">
-        <div className="lg:col-span-2">
+        <div className="space-y-6 lg:col-span-2">
+          <MyPlanCard />
           <FirstThoughtCard />
         </div>
         <ChessThermometerCard />

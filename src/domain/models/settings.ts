@@ -15,6 +15,8 @@ export const settingsSchema = z.object({
   chessComUsername: z.string().default(""),
   /** OpenAI API key used to analyze the daily first-thought check-in. */
   openaiApiKey: z.string().default(""),
+  /** Standing trading plan shown on the dashboard and supplied to the LLM. */
+  tradingPlan: z.string().default(""),
   updatedAt: timestampSchema,
 });
 export type Settings = z.infer<typeof settingsSchema>;
@@ -27,4 +29,5 @@ export const DEFAULT_SETTINGS: Omit<Settings, "updatedAt"> = {
   theme: "dark",
   chessComUsername: "",
   openaiApiKey: "",
+  tradingPlan: "",
 };

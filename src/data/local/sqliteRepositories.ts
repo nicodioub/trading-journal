@@ -1091,6 +1091,7 @@ interface SettingsRow {
   theme: string;
   chess_com_username: string;
   openai_api_key: string;
+  trading_plan: string;
   updated_at: string;
 }
 
@@ -1103,6 +1104,7 @@ function rowToSettings(row: SettingsRow): Settings {
     theme: row.theme,
     chessComUsername: row.chess_com_username,
     openaiApiKey: row.openai_api_key,
+    tradingPlan: row.trading_plan,
     updatedAt: row.updated_at,
   });
 }
@@ -1118,9 +1120,9 @@ const settingsRepository: SettingsRepository = {
     // Seed defaults on first access.
     const seeded = settingsSchema.parse({ ...DEFAULT_SETTINGS, updatedAt: nowIso() });
     await db.execute(
-      `INSERT INTO settings (id, motivational_quote, default_currency, default_risk_percent, theme, chess_com_username, openai_api_key, updated_at)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
-      [seeded.id, seeded.motivationalQuote, seeded.defaultCurrency, seeded.defaultRiskPercent, seeded.theme, seeded.chessComUsername, seeded.openaiApiKey, seeded.updatedAt],
+      `INSERT INTO settings (id, motivational_quote, default_currency, default_risk_percent, theme, chess_com_username, openai_api_key, trading_plan, updated_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+      [seeded.id, seeded.motivationalQuote, seeded.defaultCurrency, seeded.defaultRiskPercent, seeded.theme, seeded.chessComUsername, seeded.openaiApiKey, seeded.tradingPlan, seeded.updatedAt],
     );
     return seeded;
   },
@@ -1130,9 +1132,9 @@ const settingsRepository: SettingsRepository = {
     const merged = settingsSchema.parse({ ...current, ...patch, id: "default", updatedAt: nowIso() });
     const db = await getDb();
     await db.execute(
-      `UPDATE settings SET motivational_quote=$2, default_currency=$3, default_risk_percent=$4, theme=$5, chess_com_username=$6, openai_api_key=$7, updated_at=$8
+      `UPDATE settings SET motivational_quote=$2, default_currency=$3, default_risk_percent=$4, theme=$5, chess_com_username=$6, openai_api_key=$7, trading_plan=$8, updated_at=$9
        WHERE id=$1`,
-      ["default", merged.motivationalQuote, merged.defaultCurrency, merged.defaultRiskPercent, merged.theme, merged.chessComUsername, merged.openaiApiKey, merged.updatedAt],
+      ["default", merged.motivationalQuote, merged.defaultCurrency, merged.defaultRiskPercent, merged.theme, merged.chessComUsername, merged.openaiApiKey, merged.tradingPlan, merged.updatedAt],
     );
     return merged;
   },

@@ -1,7 +1,6 @@
 import {
   BarChart3,
   Brain,
-  CalendarOff,
   History,
   LayoutDashboard,
   Newspaper,
@@ -31,7 +30,6 @@ const NAV_ITEMS: NavItem[] = [
   { to: "/trades", label: "Trade History", icon: History, end: true },
   { to: "/statistics", label: "Statistics", icon: BarChart3 },
   { to: "/mind", label: "Mind", icon: Brain },
-  { to: "/readiness", label: "Readiness", icon: CalendarOff },
   { to: "/journal", label: "Journal", icon: NotebookPen },
   { to: "/rules", label: "Rules", icon: ScrollText },
   { to: "/planning", label: "Planning", icon: Target },

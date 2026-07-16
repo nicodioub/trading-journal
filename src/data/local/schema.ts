@@ -214,4 +214,10 @@ export const MIGRATIONS: Migration[] = [
       `ALTER TABLE first_thoughts ADD COLUMN biggest_concern TEXT NOT NULL DEFAULT '';`,
     ],
   },
+  {
+    version: 9,
+    statements: [
+      `ALTER TABLE settings ADD COLUMN trading_plan TEXT NOT NULL DEFAULT '';`,
+    ],
+  },
 ];

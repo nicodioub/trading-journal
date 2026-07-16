@@ -1,5 +1,5 @@
 import { format, startOfWeek } from "date-fns";
-import type { Trade } from "../models";
+import type { Account, Trade } from "../models";
 import { computeRR, getOutcome, tradeTime } from "./tradeStats";
 
 export interface PerformanceStats {
@@ -270,6 +270,101 @@ export function pnlByMonth(trades: Trade[]): PeriodPnl[] {
     (d) => format(d, "yyyy-MM"),
     (d) => format(d, "MMM yyyy"),
   );
+}
+
+export interface DailyPercentPoint {
+  key: string; // yyyy-MM-dd
+  label: string;
+  percent: number;
+  trades: number;
+  accounts: number;
+}
+
+function resolveResultPercent(
+  trade: Trade,
+  initialCapitalByAccount: Map<string, number>,
+): number | null {
+  if (trade.resultPercent !== null && Number.isFinite(trade.resultPercent)) {
+    return trade.resultPercent;
+  }
+
+  const initialCapital = initialCapitalByAccount.get(trade.accountId);
+  if (
+    trade.resultAmount === null ||
+    !Number.isFinite(trade.resultAmount) ||
+    initialCapital === undefined ||
+    initialCapital <= 0
+  ) {
+    return null;
+  }
+
+  return (trade.resultAmount / initialCapital) * 100;
+}
+
+/** Calendar years that contain a closed trade with a stored or derivable percentage. */
+export function percentageYears(trades: Trade[], accounts: Account[]): number[] {
+  const years = new Set<number>();
+  const capitalByAccount = new Map(
+    accounts.map((account) => [account.id, account.initialCapital]),
+  );
+
+  for (const trade of trades) {
+    if (trade.status !== "closed" || resolveResultPercent(trade, capitalByAccount) === null) {
+      continue;
+    }
+    years.add(new Date(trade.closedAt ?? trade.date).getFullYear());
+  }
+
+  return [...years].sort((a, b) => b - a);
+}
+
+/**
+ * Net percentage for each active trading day in a calendar year.
+ * Percentages are summed across closed trades, so accounts and currencies can
+ * be viewed together without combining monetary values.
+ */
+export function dailyPercentByYear(
+  trades: Trade[],
+  accounts: Account[],
+  year: number,
+): DailyPercentPoint[] {
+  const capitalByAccount = new Map(
+    accounts.map((account) => [account.id, account.initialCapital]),
+  );
+  const buckets = new Map<
+    string,
+    Omit<DailyPercentPoint, "accounts"> & { accountIds: Set<string> }
+  >();
+
+  for (const trade of trades) {
+    if (trade.status !== "closed") continue;
+
+    const resultPercent = resolveResultPercent(trade, capitalByAccount);
+    if (resultPercent === null) continue;
+
+    const date = new Date(trade.closedAt ?? trade.date);
+    if (date.getFullYear() !== year) continue;
+
+    const key = format(date, "yyyy-MM-dd");
+    const bucket = buckets.get(key) ?? {
+      key,
+      label: format(date, "dd MMM"),
+      percent: 0,
+      trades: 0,
+      accountIds: new Set<string>(),
+    };
+    bucket.percent += resultPercent;
+    bucket.trades += 1;
+    bucket.accountIds.add(trade.accountId);
+    buckets.set(key, bucket);
+  }
+
+  return [...buckets.values()]
+    .sort((a, b) => a.key.localeCompare(b.key))
+    .map(({ accountIds, ...point }) => ({
+      ...point,
+      accounts: accountIds.size,
+    }));
 }
 
 /** Best / worst single day by realized PnL. */

@@ -93,6 +93,9 @@ class MemoryStore {
         const parsed = firstThoughtSchema.safeParse(t);
         return parsed.success ? [parsed.data] : [];
       });
+      if (this.settings) {
+        this.settings = settingsSchema.parse(this.settings);
+      }
     } catch {
       // Corrupt/unavailable storage — start clean.
     }

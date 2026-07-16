@@ -76,7 +76,9 @@ export function RulesPage() {
                 <span className="w-6 shrink-0 text-xs font-semibold tabular-nums text-muted-foreground">
                   {index + 1}
                 </span>
-                <p className="flex-1 text-sm">{rule.content}</p>
+                <p className="flex-1 text-sm font-medium text-danger">
+                  {rule.content}
+                </p>
                 <ConfirmDialog
                   trigger={
                     <Button variant="ghost" size="icon">

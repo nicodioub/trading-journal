@@ -262,6 +262,7 @@ export function FirstThoughtCard() {
       const behaviorWindow = buildBehaviorWindow(history, readinessRules, trades, journalEntries, date, 7);
       const behavioralContext = computeBehavioralContext(behaviorWindow);
       const analysis = await analyzeFirstThought(trimmedThought, trimmedJob, settings.openaiApiKey, {
+        plan: settings.tradingPlan,
         chess: chessContext,
         weekly: weeklyContext.trades > 0 ? weeklyContext : null,
         psychLoad: weeklyContext.trades > 0 ? psychologicalLoad : null,

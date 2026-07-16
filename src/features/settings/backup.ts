@@ -164,6 +164,7 @@ export async function importData(
     theme: data.settings.theme,
     chessComUsername: data.settings.chessComUsername ?? "",
     openaiApiKey: data.settings.openaiApiKey ?? "",
+    tradingPlan: data.settings.tradingPlan ?? "",
   });
 }
 
