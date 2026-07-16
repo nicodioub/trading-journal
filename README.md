@@ -1,11 +1,43 @@
 # Henledger
 
-A personal, offline-first desktop **trading ledger** built to be a trading
-_companion_ focused on psychology, discipline, performance and account tracking.
+**The trading journal that catches traders lying to themselves.**
 
-Not a SaaS. Every install is a private, local app with its own database. It can
-be shared by handing someone the installer, and it's architected so it _could_
-be deployed online later without rewriting the app.
+Every trading journal logs *what* a trader did. Henledger is built around a
+different question: does what they *did* match what they *said* they'd do?
+It pairs daily psychological check-ins with actual trade execution and
+surfaces the contradictions — the trader who journaled "I'll wait for my
+setup" and then entered a trade nine minutes later, the pattern of losses
+that only shows up after a low-readiness morning. That's evidence a trader
+(or a coach, or a prop firm) can act on, not just another equity curve.
+
+## What makes it different
+
+- **Behavior Engine, not a mood tracker.** Most journaling apps collect
+  self-reported feelings and stop there. Henledger's Behavior Engine
+  (`domain/services/behaviorEngine.ts`) runs a rolling 7-day window that
+  cross-references declared readiness, journaled first-thoughts, and actual
+  trades — flagging when a trader violated their own stated rules and how
+  fast they did it (see `minutesFromCheckInToFirstTrade`). It's identity
+  coaching backed by evidence, not vibes.
+- **Discipline is measured, not just recorded.** Readiness rules, a rules
+  engine, and psychology scoring turn "was I disciplined today" from a
+  journal entry into a quantified, auditable signal over time.
+- **Privacy by architecture, not by policy.** There's no backend to breach
+  because there isn't one — every install is a private, local SQLite
+  database. For a product that stores a trader's psychological
+  self-assessments alongside their P&L, that's not a nice-to-have.
+- **Built to go online without a rewrite.** The UI only ever talks to
+  repository interfaces (`TradeRepository`, `AccountRepository`, …), never
+  to SQLite directly. Standing up a hosted, multi-tenant version later is
+  "implement one more adapter," not "rebuild the app" — see Architecture
+  below.
+- **One founder, full-stack execution.** Domain modeling, UI, native
+  desktop packaging, and an AI-driven behavioral analysis pipeline, shipped
+  as a working desktop app — not a slide deck.
+
+Not a SaaS today by design. Every install is a private, local app with its
+own database. It can be shared by handing someone the installer, and it's
+architected so it _could_ be deployed online later without rewriting the app.
 
 ## Stack
 
