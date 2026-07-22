@@ -29,6 +29,12 @@
   --danger: 0 72% 58%;
   --warning: 38 92% 55%;
 
+  /* Calm "thermometer" ramp for the Mentor — cool low, neutral mid, warm-but-
+     desaturated high. Deliberately no red: a reading to check, not an alarm. */
+  --calm-low: 202 42% 55%;
+  --calm-mid: 220 14% 60%;
+  --calm-high: 34 48% 60%;
+
   --radius: 0.75rem;
 }
 
@@ -57,4 +63,8 @@
   --success: 150 55% 40%;
   --danger: 0 72% 50%;
   --warning: 38 92% 48%;
+
+  --calm-low: 202 45% 45%;
+  --calm-mid: 220 12% 52%;
+  --calm-high: 34 52% 50%;
 }

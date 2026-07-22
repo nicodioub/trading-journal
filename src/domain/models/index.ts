@@ -10,4 +10,5 @@ export * from "./readinessRule";
 export * from "./journalEntry";
 export * from "./tradingRule";
 export * from "./planningObjective";
+export * from "./mentorConversation";
 export * from "./settings";

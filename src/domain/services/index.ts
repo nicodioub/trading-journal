@@ -1,5 +1,6 @@
 export * from "./tradeStats";
 export * from "./statistics";
+export * from "./mentorStats";
 export * from "./accountStats";
 export * from "./behaviorEngine";
 export * from "./chessStats";

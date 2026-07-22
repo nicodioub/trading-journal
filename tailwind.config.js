@@ -31,6 +31,11 @@ export default {
         success: "hsl(var(--success) / <alpha-value>)",
         danger: "hsl(var(--danger) / <alpha-value>)",
         warning: "hsl(var(--warning) / <alpha-value>)",
+        calm: {
+          low: "hsl(var(--calm-low) / <alpha-value>)",
+          mid: "hsl(var(--calm-mid) / <alpha-value>)",
+          high: "hsl(var(--calm-high) / <alpha-value>)",
+        },
       },
       borderRadius: {
         xl: "calc(var(--radius) + 4px)",
