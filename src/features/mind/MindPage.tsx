@@ -12,7 +12,7 @@ import {
 } from "@/components/ui";
 import { useAccounts, useChessStatsList, useFirstThoughts, useMentalChecks, useTrades } from "@/data";
 import {
-  buildDailyChessSeries,
+  buildChessTradingTrend,
   buildDailyPsychologySeries,
   computeChessCorrelations,
   computePsychologyCorrelations,
@@ -49,7 +49,7 @@ export function MindPage() {
     [checks, trades],
   );
   const dailyChess = useMemo(
-    () => buildDailyChessSeries(chess, trades),
+    () => buildChessTradingTrend(chess, trades),
     [chess, trades],
   );
 

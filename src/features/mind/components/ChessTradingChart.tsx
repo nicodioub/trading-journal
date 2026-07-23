@@ -9,15 +9,19 @@ import {
   YAxis,
 } from "recharts";
 import { ChartTooltip, useChartTokens } from "@/components/charts";
-import type { DailyChessPoint } from "@/domain";
+import type { ChessTradingTrendPoint } from "@/domain";
 import { formatPercent } from "@/lib/format";
+
+function pct(value: unknown): string {
+  return typeof value === "number" ? formatPercent(value, 0) : "—";
+}
 
 /**
  * Chess win-rate vs trading win-rate, day by day. Both are percentages on one
  * shared 0–100 axis (never a dual axis). Two categorical series — a blue/amber
  * pair chosen for colorblind separation — each named in the legend.
  */
-export function ChessTradingChart({ data }: { data: DailyChessPoint[] }) {
+export function ChessTradingChart({ data }: { data: ChessTradingTrendPoint[] }) {
   const c = useChartTokens();
   const series = [
     { key: "chessWinRate", label: "Chess", color: c.primary },
@@ -56,17 +60,19 @@ export function ChessTradingChart({ data }: { data: DailyChessPoint[] }) {
             />
             <Tooltip
               cursor={{ stroke: c.axis, strokeDasharray: "4 4" }}
-              content={(props: any) =>
-                props.active && props.payload?.length ? (
+              content={(props: any) => {
+                if (!props.active || !props.payload?.length) return null;
+                const row = props.payload[0]?.payload ?? {};
+                return (
                   <ChartTooltip
                     label={format(new Date(props.label), "dd MMM yyyy")}
                     rows={[
-                      { label: "Chess", value: formatPercent(props.payload[0]?.value ?? 0, 0), color: c.primary },
-                      { label: "Trading", value: formatPercent(props.payload[1]?.value ?? 0, 0), color: c.warning },
+                      { label: "Chess", value: pct(row.chessWinRate), color: c.primary },
+                      { label: "Trading", value: pct(row.tradingWinRate), color: c.warning },
                     ]}
                   />
-                ) : null
-              }
+                );
+              }}
             />
             {series.map((s) => (
               <Line
@@ -78,6 +84,7 @@ export function ChessTradingChart({ data }: { data: DailyChessPoint[] }) {
                 strokeWidth={2}
                 dot={false}
                 activeDot={{ r: 4, strokeWidth: 0 }}
+                connectNulls
               />
             ))}
           </LineChart>

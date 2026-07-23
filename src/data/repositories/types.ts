@@ -10,6 +10,8 @@ import type {
   JournalEntryInput,
   MentalCheck,
   MentalCheckInput,
+  MentorConversation,
+  MentorConversationInput,
   PlanningObjective,
   PlanningObjectiveInput,
   ReadinessRule,
@@ -88,6 +90,14 @@ export interface FirstThoughtRepository {
   save(input: FirstThoughtInput): Promise<FirstThought>;
 }
 
+export interface MentorConversationRepository {
+  list(): Promise<MentorConversation[]>;
+  get(id: string): Promise<MentorConversation | null>;
+  create(input: MentorConversationInput): Promise<MentorConversation>;
+  update(id: string, patch: Partial<MentorConversationInput>): Promise<MentorConversation>;
+  delete(id: string): Promise<void>;
+}
+
 export interface ReadinessRuleRepository {
   list(): Promise<ReadinessRule[]>;
   /** The rule covering a given date, if any (most recently created wins on overlap). */
@@ -152,6 +162,7 @@ export interface Repositories {
   tradeNotes: TradeNoteRepository;
   mentalChecks: MentalCheckRepository;
   firstThoughts: FirstThoughtRepository;
+  mentorConversations: MentorConversationRepository;
   readinessRules: ReadinessRuleRepository;
   planningObjectives: PlanningObjectiveRepository;
   chessStats: ChessStatsRepository;

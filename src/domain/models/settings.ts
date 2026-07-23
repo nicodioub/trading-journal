@@ -17,6 +17,12 @@ export const settingsSchema = z.object({
   openaiApiKey: z.string().default(""),
   /** Standing trading plan shown on the dashboard and supplied to the LLM. */
   tradingPlan: z.string().default(""),
+  /**
+   * Timezone the market-sessions clock is drawn in. Either "auto" (follow the
+   * device's local time, DST included) or a fixed UTC offset in hours as a
+   * string, e.g. "3" for UTC+3 or "-4" for UTC-4 (halves like "5.5" allowed).
+   */
+  utcOffset: z.string().default("auto"),
   updatedAt: timestampSchema,
 });
 export type Settings = z.infer<typeof settingsSchema>;
@@ -30,4 +36,5 @@ export const DEFAULT_SETTINGS: Omit<Settings, "updatedAt"> = {
   chessComUsername: "",
   openaiApiKey: "",
   tradingPlan: "",
+  utcOffset: "auto",
 };

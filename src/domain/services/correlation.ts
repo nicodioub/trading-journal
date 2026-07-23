@@ -164,6 +164,43 @@ export function buildDailyChessSeries(
     .sort((a, b) => a.date.localeCompare(b.date));
 }
 
+export interface ChessTradingTrendPoint {
+  date: string;
+  /** null on days with no chess games — so the line can bridge the gap. */
+  chessWinRate: number | null;
+  /** null on days with no closed trades. */
+  tradingWinRate: number | null;
+}
+
+/**
+ * Chess win-rate and trading win-rate per day, over the *union* of days that
+ * have either. Unlike {@link buildDailyChessSeries} (which keeps only days
+ * with both, for the paired correlation), this keeps every day so the trend
+ * chart reflects all activity; the missing side is `null` and the chart
+ * connects across the gap.
+ */
+export function buildChessTradingTrend(
+  chessStats: ChessStats[],
+  trades: Trade[],
+): ChessTradingTrendPoint[] {
+  const byDay = aggregate(trades, dayKey);
+  const chessByDay = new Map(
+    chessStats.filter((s) => s.gamesPlayed > 0).map((s) => [s.date, s] as const),
+  );
+  const days = new Set<string>([...chessByDay.keys(), ...byDay.keys()]);
+  return [...days]
+    .sort((a, b) => a.localeCompare(b))
+    .map((date): ChessTradingTrendPoint => {
+      const s = chessByDay.get(date);
+      const agg = byDay.get(date);
+      return {
+        date,
+        chessWinRate: s ? chessWinRate(s) : null,
+        tradingWinRate: agg && agg.trades > 0 ? (agg.wins / agg.trades) * 100 : null,
+      };
+    });
+}
+
 export interface ChessCorrelations {
   sampleSize: number;
   chessVsTradingWinRate: number | null;

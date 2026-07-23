@@ -6,6 +6,7 @@ import {
   getOutcome,
   journalEntrySchema,
   mentalCheckSchema,
+  mentorConversationSchema,
   planningObjectiveSchema,
   readinessRuleSchema,
   settingsSchema,
@@ -18,6 +19,7 @@ import {
   type FirstThought,
   type JournalEntry,
   type MentalCheck,
+  type MentorConversation,
   type PlanningObjective,
   type ReadinessRule,
   type Settings,
@@ -33,6 +35,7 @@ import type {
   FirstThoughtRepository,
   JournalEntryRepository,
   MentalCheckRepository,
+  MentorConversationRepository,
   PlanningObjectiveRepository,
   ReadinessRuleRepository,
   Repositories,
@@ -1021,6 +1024,107 @@ const journalEntryRepository: JournalEntryRepository = {
 };
 
 /* ------------------------------------------------------------------ *
+ * Mentor conversations
+ * ------------------------------------------------------------------ */
+
+interface MentorConversationRow {
+  id: string;
+  date: string;
+  title: string;
+  focus_trade_id: string | null;
+  messages: string;
+  created_at: string;
+  updated_at: string;
+}
+
+function rowToMentorConversation(row: MentorConversationRow): MentorConversation {
+  return mentorConversationSchema.parse({
+    id: row.id,
+    date: row.date,
+    title: row.title,
+    focusTradeId: row.focus_trade_id,
+    messages: JSON.parse(row.messages),
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  });
+}
+
+const mentorConversationRepository: MentorConversationRepository = {
+  async list() {
+    const db = await getDb();
+    const rows = await db.select<MentorConversationRow[]>(
+      "SELECT * FROM mentor_conversations ORDER BY updated_at DESC",
+    );
+    return rows.map(rowToMentorConversation);
+  },
+
+  async get(id) {
+    const db = await getDb();
+    const rows = await db.select<MentorConversationRow[]>(
+      "SELECT * FROM mentor_conversations WHERE id = $1",
+      [id],
+    );
+    return rows[0] ? rowToMentorConversation(rows[0]) : null;
+  },
+
+  async create(input) {
+    const db = await getDb();
+    const conversation = mentorConversationSchema.parse({
+      ...input,
+      id: createId(),
+      createdAt: nowIso(),
+      updatedAt: nowIso(),
+    });
+    await db.execute(
+      `INSERT INTO mentor_conversations (id, date, title, focus_trade_id, messages, created_at, updated_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+      [
+        conversation.id,
+        conversation.date,
+        conversation.title,
+        conversation.focusTradeId,
+        JSON.stringify(conversation.messages),
+        conversation.createdAt,
+        conversation.updatedAt,
+      ],
+    );
+    return conversation;
+  },
+
+  async update(id, patch) {
+    const db = await getDb();
+    const rows = await db.select<MentorConversationRow[]>(
+      "SELECT * FROM mentor_conversations WHERE id = $1",
+      [id],
+    );
+    if (!rows[0]) throw new Error(`Mentor conversation ${id} not found`);
+    const merged = mentorConversationSchema.parse({
+      ...rowToMentorConversation(rows[0]),
+      ...patch,
+      updatedAt: nowIso(),
+    });
+    await db.execute(
+      `UPDATE mentor_conversations SET date=$2, title=$3, focus_trade_id=$4, messages=$5, updated_at=$6
+       WHERE id=$1`,
+      [
+        merged.id,
+        merged.date,
+        merged.title,
+        merged.focusTradeId,
+        JSON.stringify(merged.messages),
+        merged.updatedAt,
+      ],
+    );
+    return merged;
+  },
+
+  async delete(id) {
+    const db = await getDb();
+    await db.execute("DELETE FROM mentor_conversations WHERE id = $1", [id]);
+  },
+};
+
+/* ------------------------------------------------------------------ *
  * Trading rules
  * ------------------------------------------------------------------ */
 
@@ -1092,6 +1196,7 @@ interface SettingsRow {
   chess_com_username: string;
   openai_api_key: string;
   trading_plan: string;
+  utc_offset: string;
   updated_at: string;
 }
 
@@ -1105,6 +1210,7 @@ function rowToSettings(row: SettingsRow): Settings {
     chessComUsername: row.chess_com_username,
     openaiApiKey: row.openai_api_key,
     tradingPlan: row.trading_plan,
+    utcOffset: row.utc_offset,
     updatedAt: row.updated_at,
   });
 }
@@ -1120,9 +1226,9 @@ const settingsRepository: SettingsRepository = {
     // Seed defaults on first access.
     const seeded = settingsSchema.parse({ ...DEFAULT_SETTINGS, updatedAt: nowIso() });
     await db.execute(
-      `INSERT INTO settings (id, motivational_quote, default_currency, default_risk_percent, theme, chess_com_username, openai_api_key, trading_plan, updated_at)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
-      [seeded.id, seeded.motivationalQuote, seeded.defaultCurrency, seeded.defaultRiskPercent, seeded.theme, seeded.chessComUsername, seeded.openaiApiKey, seeded.tradingPlan, seeded.updatedAt],
+      `INSERT INTO settings (id, motivational_quote, default_currency, default_risk_percent, theme, chess_com_username, openai_api_key, trading_plan, utc_offset, updated_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
+      [seeded.id, seeded.motivationalQuote, seeded.defaultCurrency, seeded.defaultRiskPercent, seeded.theme, seeded.chessComUsername, seeded.openaiApiKey, seeded.tradingPlan, seeded.utcOffset, seeded.updatedAt],
     );
     return seeded;
   },
@@ -1132,9 +1238,9 @@ const settingsRepository: SettingsRepository = {
     const merged = settingsSchema.parse({ ...current, ...patch, id: "default", updatedAt: nowIso() });
     const db = await getDb();
     await db.execute(
-      `UPDATE settings SET motivational_quote=$2, default_currency=$3, default_risk_percent=$4, theme=$5, chess_com_username=$6, openai_api_key=$7, trading_plan=$8, updated_at=$9
+      `UPDATE settings SET motivational_quote=$2, default_currency=$3, default_risk_percent=$4, theme=$5, chess_com_username=$6, openai_api_key=$7, trading_plan=$8, utc_offset=$9, updated_at=$10
        WHERE id=$1`,
-      ["default", merged.motivationalQuote, merged.defaultCurrency, merged.defaultRiskPercent, merged.theme, merged.chessComUsername, merged.openaiApiKey, merged.tradingPlan, merged.updatedAt],
+      ["default", merged.motivationalQuote, merged.defaultCurrency, merged.defaultRiskPercent, merged.theme, merged.chessComUsername, merged.openaiApiKey, merged.tradingPlan, merged.utcOffset, merged.updatedAt],
     );
     return merged;
   },
@@ -1150,6 +1256,7 @@ async function resetDatabase(): Promise<void> {
     "accounts",
     "mental_checks",
     "first_thoughts",
+    "mentor_conversations",
     "readiness_rules",
     "planning_objectives",
     "chess_stats",
@@ -1170,6 +1277,7 @@ export function createSqliteRepositories(): Repositories {
     tradeNotes: tradeNoteRepository,
     mentalChecks: mentalCheckRepository,
     firstThoughts: firstThoughtRepository,
+    mentorConversations: mentorConversationRepository,
     readinessRules: readinessRuleRepository,
     planningObjectives: planningObjectiveRepository,
     chessStats: chessStatsRepository,

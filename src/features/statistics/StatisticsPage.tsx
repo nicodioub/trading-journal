@@ -1,5 +1,9 @@
 import { useMemo, useState } from "react";
-import { DailyPercentChart, PnlBarChart } from "@/components/charts";
+import {
+  DailyPercentChart,
+  PnlBarChart,
+  YearlyPercentHeatmap,
+} from "@/components/charts";
 import { PageHeader } from "@/components/layout";
 import {
   Card,
@@ -242,6 +246,18 @@ export function StatisticsPage() {
                   </div>
                   <div className="h-80">
                     <DailyPercentChart data={yearlyData} year={selectedYear} />
+                  </div>
+                  <div className="space-y-3 border-t border-border pt-5">
+                    <div>
+                      <h3 className="text-sm font-semibold">Monthly heatmap</h3>
+                      <p className="text-xs text-muted-foreground">
+                        Hover a day to see its exact all-account return.
+                      </p>
+                    </div>
+                    <YearlyPercentHeatmap
+                      data={yearlyData}
+                      year={selectedYear}
+                    />
                   </div>
                 </div>
               )}

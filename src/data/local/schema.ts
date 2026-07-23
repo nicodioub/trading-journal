@@ -220,4 +220,25 @@ export const MIGRATIONS: Migration[] = [
       `ALTER TABLE settings ADD COLUMN trading_plan TEXT NOT NULL DEFAULT '';`,
     ],
   },
+  {
+    version: 10,
+    statements: [
+      `CREATE TABLE IF NOT EXISTS mentor_conversations (
+        id TEXT PRIMARY KEY,
+        date TEXT NOT NULL,
+        title TEXT NOT NULL DEFAULT '',
+        focus_trade_id TEXT,
+        messages TEXT NOT NULL DEFAULT '[]',
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );`,
+      `CREATE INDEX IF NOT EXISTS idx_mentor_conversations_date ON mentor_conversations(date);`,
+    ],
+  },
+  {
+    version: 11,
+    statements: [
+      `ALTER TABLE settings ADD COLUMN utc_offset TEXT NOT NULL DEFAULT 'auto';`,
+    ],
+  },
 ];

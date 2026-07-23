@@ -7,6 +7,7 @@ import {
   getOutcome,
   journalEntrySchema,
   mentalCheckSchema,
+  mentorConversationSchema,
   planningObjectiveSchema,
   readinessRuleSchema,
   settingsSchema,
@@ -19,6 +20,7 @@ import {
   type FirstThought,
   type JournalEntry,
   type MentalCheck,
+  type MentorConversation,
   type PlanningObjective,
   type ReadinessRule,
   type Settings,
@@ -50,6 +52,7 @@ interface Snapshot {
   tradeNotes: TradeNote[];
   mentalChecks: MentalCheck[];
   firstThoughts: FirstThought[];
+  mentorConversations: MentorConversation[];
   readinessRules: ReadinessRule[];
   planningObjectives: PlanningObjective[];
   chessStats: ChessStats[];
@@ -69,6 +72,7 @@ class MemoryStore {
   tradeNotes: TradeNote[] = [];
   mentalChecks: MentalCheck[] = [];
   firstThoughts: FirstThought[] = [];
+  mentorConversations: MentorConversation[] = [];
   readinessRules: ReadinessRule[] = [];
   planningObjectives: PlanningObjective[] = [];
   chessStats: ChessStats[] = [];
@@ -93,6 +97,10 @@ class MemoryStore {
         const parsed = firstThoughtSchema.safeParse(t);
         return parsed.success ? [parsed.data] : [];
       });
+      this.mentorConversations = (this.mentorConversations ?? []).flatMap((c) => {
+        const parsed = mentorConversationSchema.safeParse(c);
+        return parsed.success ? [parsed.data] : [];
+      });
       if (this.settings) {
         this.settings = settingsSchema.parse(this.settings);
       }
@@ -109,6 +117,7 @@ class MemoryStore {
       tradeNotes: this.tradeNotes,
       mentalChecks: this.mentalChecks,
       firstThoughts: this.firstThoughts,
+      mentorConversations: this.mentorConversations,
       readinessRules: this.readinessRules,
       planningObjectives: this.planningObjectives,
       chessStats: this.chessStats,
@@ -449,6 +458,47 @@ export function createMemoryRepositories(): Repositories {
       },
     },
 
+    mentorConversations: {
+      async list() {
+        return [...store.mentorConversations].sort((a, b) =>
+          b.updatedAt.localeCompare(a.updatedAt),
+        );
+      },
+      async get(id) {
+        return store.mentorConversations.find((c) => c.id === id) ?? null;
+      },
+      async create(input) {
+        const conversation = mentorConversationSchema.parse({
+          ...input,
+          id: createId(),
+          createdAt: nowIso(),
+          updatedAt: nowIso(),
+        });
+        store.mentorConversations.push(conversation);
+        store.persist();
+        return conversation;
+      },
+      async update(id, patch) {
+        const existing = store.mentorConversations.find((c) => c.id === id);
+        if (!existing) throw new Error(`Mentor conversation ${id} not found`);
+        const merged = mentorConversationSchema.parse({
+          ...existing,
+          ...patch,
+          id,
+          updatedAt: nowIso(),
+        });
+        store.mentorConversations = store.mentorConversations.map((c) =>
+          c.id === id ? merged : c,
+        );
+        store.persist();
+        return merged;
+      },
+      async delete(id) {
+        store.mentorConversations = store.mentorConversations.filter((c) => c.id !== id);
+        store.persist();
+      },
+    },
+
     tradingRules: {
       async list() {
         return [...store.tradingRules].sort((a, b) => a.createdAt.localeCompare(b.createdAt));
@@ -499,6 +549,7 @@ export function createMemoryRepositories(): Repositories {
       store.tradeNotes = [];
       store.mentalChecks = [];
       store.firstThoughts = [];
+      store.mentorConversations = [];
       store.readinessRules = [];
       store.planningObjectives = [];
       store.chessStats = [];

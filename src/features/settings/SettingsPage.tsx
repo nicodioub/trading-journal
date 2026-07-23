@@ -37,6 +37,14 @@ import {
   type BackupData,
 } from "./backup";
 
+/** Whole-hour UTC offsets offered in the timezone picker, UTC-12 … UTC+14. */
+const UTC_OFFSETS = Array.from({ length: 27 }, (_, i) => i - 12);
+
+function utcOffsetLabel(offset: number): string {
+  const sign = offset >= 0 ? "+" : "−";
+  return `UTC${sign}${Math.abs(offset)}`;
+}
+
 export function SettingsPage() {
   const { data: settings } = useSettings();
   const update = useUpdateSettings();
@@ -49,6 +57,7 @@ export function SettingsPage() {
   const [theme, setTheme] = useState<Theme>("dark");
   const [chessComUsername, setChessComUsername] = useState("");
   const [openaiApiKey, setOpenaiApiKey] = useState("");
+  const [utcOffset, setUtcOffset] = useState("auto");
 
   const fileRef = useRef<HTMLInputElement>(null);
   const [pendingImport, setPendingImport] = useState<BackupData | null>(null);
@@ -68,6 +77,7 @@ export function SettingsPage() {
       setTheme(settings.theme);
       setChessComUsername(settings.chessComUsername);
       setOpenaiApiKey(settings.openaiApiKey);
+      setUtcOffset(settings.utcOffset);
     }
   }, [settings]);
 
@@ -79,6 +89,7 @@ export function SettingsPage() {
       theme,
       chessComUsername: chessComUsername.trim(),
       openaiApiKey: openaiApiKey.trim(),
+      utcOffset,
     });
 
   const handleExport = async () => {
@@ -183,6 +194,25 @@ export function SettingsPage() {
                   <SelectItem value="system">System</SelectItem>
                 </SelectContent>
               </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Your timezone</Label>
+              <Select value={utcOffset} onValueChange={setUtcOffset}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="auto">Automatic (device time)</SelectItem>
+                  {UTC_OFFSETS.map((offset) => (
+                    <SelectItem key={offset} value={String(offset)}>
+                      {utcOffsetLabel(offset)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Sets the timezone for the market-sessions clock on your dashboard.
+              </p>
             </div>
           </CardContent>
         </Card>

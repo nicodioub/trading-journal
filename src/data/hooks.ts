@@ -9,6 +9,7 @@ import type {
   FirstThoughtInput,
   JournalEntryInput,
   MentalCheckInput,
+  MentorConversationInput,
   PlanningObjectiveInput,
   ReadinessRuleInput,
   Settings,
@@ -31,6 +32,8 @@ export const queryKeys = {
   mentalCheck: (date: string) => ["mentalCheck", date] as const,
   firstThoughts: ["firstThoughts"] as const,
   firstThought: (date: string) => ["firstThought", date] as const,
+  mentorConversations: ["mentorConversations"] as const,
+  mentorConversation: (id: string) => ["mentorConversation", id] as const,
   readinessRules: ["readinessRules"] as const,
   readinessRuleForDate: (date: string) => ["readinessRule", date] as const,
   planningObjective: (accountId: string) => ["planningObjective", accountId] as const,
@@ -357,6 +360,44 @@ export function useSaveChessStats() {
   return useMutation({
     mutationFn: (input: ChessStatsInput) => repos.chessStats.save(input),
     onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.chessStats }),
+  });
+}
+
+/* ----------------------- Mentor conversations ----------------------- */
+
+export function useMentorConversations() {
+  const repos = useRepositories();
+  return useQuery({
+    queryKey: queryKeys.mentorConversations,
+    queryFn: () => repos.mentorConversations.list(),
+  });
+}
+
+export function useCreateMentorConversation() {
+  const repos = useRepositories();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: MentorConversationInput) => repos.mentorConversations.create(input),
+    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.mentorConversations }),
+  });
+}
+
+export function useUpdateMentorConversation() {
+  const repos = useRepositories();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, patch }: { id: string; patch: Partial<MentorConversationInput> }) =>
+      repos.mentorConversations.update(id, patch),
+    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.mentorConversations }),
+  });
+}
+
+export function useDeleteMentorConversation() {
+  const repos = useRepositories();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => repos.mentorConversations.delete(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.mentorConversations }),
   });
 }
 

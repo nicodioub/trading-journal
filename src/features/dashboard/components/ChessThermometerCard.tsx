@@ -1,5 +1,5 @@
 import { Brain, RefreshCw } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   Button,
   Card,
@@ -16,6 +16,13 @@ import { formatPercent } from "@/lib/format";
 import { fetchChessComDailyResult } from "../chessCom";
 
 const DEFAULT = { gamesPlayed: 0, gamesWon: 0, gamesLost: 0 };
+
+/**
+ * Guards the automatic sync so it runs at most once per app launch (module
+ * state resets on a full reload / app reopen), not on every remount as the
+ * user navigates back to the dashboard.
+ */
+let autoSyncedThisLaunch = false;
 
 /**
  * The "cognitive thermometer" — today's chess performance, tracked so it can be
@@ -44,12 +51,14 @@ export function ChessThermometerCard() {
   const set = (key: keyof typeof form, value: string) =>
     setForm((prev) => ({ ...prev, [key]: Math.max(0, Number(value) || 0) }));
 
-  const handleSync = async () => {
-    if (!settings?.chessComUsername) return;
+  const username = settings?.chessComUsername;
+
+  const handleSync = useCallback(async () => {
+    if (!username) return;
     setSyncing(true);
     setSyncError(null);
     try {
-      const result = await fetchChessComDailyResult(settings.chessComUsername, date);
+      const result = await fetchChessComDailyResult(username, date);
       setForm(result);
       // Persist immediately — otherwise a synced-but-unsaved result is only in
       // local state and both disappears on reload and stays invisible to the
@@ -60,7 +69,16 @@ export function ChessThermometerCard() {
     } finally {
       setSyncing(false);
     }
-  };
+  }, [username, date, save]);
+
+  // Auto-refresh today's chess result from Chess.com once each time the app is
+  // opened (a username must be linked). The synced result is saved immediately,
+  // so no button press is needed to keep the day's data current.
+  useEffect(() => {
+    if (autoSyncedThisLaunch || !username) return;
+    autoSyncedThisLaunch = true;
+    void handleSync();
+  }, [username, handleSync]);
 
   return (
     <Card>

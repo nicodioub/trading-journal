@@ -31,6 +31,9 @@ const StatisticsPage = lazy(() =>
 const MindPage = lazy(() =>
   import("@/features/mind/MindPage").then((m) => ({ default: m.MindPage })),
 );
+const MentorPage = lazy(() =>
+  import("@/features/mentor/MentorPage").then((m) => ({ default: m.MentorPage })),
+);
 const JournalPage = lazy(() =>
   import("@/features/journal/JournalPage").then((m) => ({ default: m.JournalPage })),
 );
@@ -65,6 +68,7 @@ export const router = createHashRouter([
       { path: "trades/:tradeId/edit", element: <EditTradePage /> },
       { path: "statistics", element: <StatisticsPage /> },
       { path: "mind", element: <MindPage /> },
+      { path: "mentor", element: <MentorPage /> },
       { path: "journal", element: <JournalPage /> },
       { path: "rules", element: <RulesPage /> },
       { path: "planning", element: <PlanningPage /> },

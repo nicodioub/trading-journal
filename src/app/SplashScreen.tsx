@@ -1,16 +1,16 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getSessionSplashQuote } from "@/data/splashQuotes";
 
-const LOGO_FADE_IN_MS = 2200;
-const TEXT_DELAY_MS = 1400;
-const HINT_DELAY_MS = TEXT_DELAY_MS + 1200;
-const FADE_OUT_MS = 700;
+const LOGO_FADE_IN_MS = 650;
+const TEXT_DELAY_MS = 180;
+const HINT_DELAY_MS = 500;
+const FADE_OUT_MS = 200;
 
 interface SplashScreenProps {
   onFinish: () => void;
 }
 
-/** Boot splash: black screen, logo fades in uniformly, then a greeting + random quote. Waits for Enter to continue. */
+/** Boot splash shown while the app preloads behind it; waits for an explicit skip. */
 export function SplashScreen({ onFinish }: SplashScreenProps) {
   const quote = useMemo(() => getSessionSplashQuote(), []);
   const [logoVisible, setLogoVisible] = useState(false);
@@ -18,6 +18,14 @@ export function SplashScreen({ onFinish }: SplashScreenProps) {
   const [hintVisible, setHintVisible] = useState(false);
   const [exiting, setExiting] = useState(false);
   const [logoFailed, setLogoFailed] = useState(false);
+  const exitStarted = useRef(false);
+
+  const beginExit = useCallback(() => {
+    if (exitStarted.current) return;
+    exitStarted.current = true;
+    setExiting(true);
+    setTimeout(onFinish, FADE_OUT_MS);
+  }, [onFinish]);
 
   useEffect(() => {
     const timers = [
@@ -26,22 +34,20 @@ export function SplashScreen({ onFinish }: SplashScreenProps) {
       setTimeout(() => setHintVisible(true), HINT_DELAY_MS),
     ];
     return () => timers.forEach(clearTimeout);
-  }, []);
+  }, [beginExit]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Enter" && !exiting) {
-        setExiting(true);
-        setTimeout(onFinish, FADE_OUT_MS);
-      }
+      if (e.key === "Enter") beginExit();
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [exiting, onFinish]);
+  }, [beginExit]);
 
   return (
     <div
       className="fixed inset-0 z-[100] flex flex-col items-center justify-center gap-10 bg-black transition-opacity ease-linear"
+      onClick={beginExit}
       style={{
         opacity: exiting ? 0 : 1,
         transitionDuration: `${FADE_OUT_MS}ms`,
@@ -79,7 +85,7 @@ export function SplashScreen({ onFinish }: SplashScreenProps) {
         className="absolute bottom-10 text-xs tracking-[0.15em] text-white/40 transition-opacity duration-700 ease-out"
         style={{ opacity: hintVisible ? 1 : 0 }}
       >
-        PRESS ENTER TO CONTINUE
+        PRESS ENTER OR CLICK TO CONTINUE
       </p>
     </div>
   );

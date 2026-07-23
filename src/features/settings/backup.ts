@@ -5,6 +5,7 @@ import type {
   FirstThought,
   JournalEntry,
   MentalCheck,
+  MentorConversation,
   ReadinessRule,
   Settings,
   Trade,
@@ -27,6 +28,7 @@ export interface BackupData {
   tradeNotes: TradeNote[];
   mentalChecks: MentalCheck[];
   firstThoughts: FirstThought[];
+  mentorConversations: MentorConversation[];
   readinessRules: ReadinessRule[];
   chessStats: ChessStats[];
   journalEntries: JournalEntry[];
@@ -56,6 +58,7 @@ export async function exportData(repos: Repositories): Promise<BackupData> {
     tradeNotes,
     mentalChecks: await repos.mentalChecks.list(),
     firstThoughts: await repos.firstThoughts.list(),
+    mentorConversations: await repos.mentorConversations.list(),
     readinessRules: await repos.readinessRules.list(),
     chessStats: await repos.chessStats.list(),
     journalEntries: await repos.journalEntries.list(),
@@ -127,6 +130,18 @@ export async function importData(
     await repos.firstThoughts.save(input);
   }
 
+  for (const conversation of data.mentorConversations ?? []) {
+    const { id, createdAt, updatedAt, focusTradeId, ...input } = conversation;
+    void id;
+    void createdAt;
+    void updatedAt;
+    // Remap the focused trade to its new id; drop it if the trade wasn't in the backup.
+    await repos.mentorConversations.create({
+      ...input,
+      focusTradeId: focusTradeId ? (tradeIdMap.get(focusTradeId) ?? null) : null,
+    });
+  }
+
   for (const rule of data.readinessRules ?? []) {
     const { id, createdAt, ...input } = rule;
     void id;
@@ -165,6 +180,7 @@ export async function importData(
     chessComUsername: data.settings.chessComUsername ?? "",
     openaiApiKey: data.settings.openaiApiKey ?? "",
     tradingPlan: data.settings.tradingPlan ?? "",
+    utcOffset: data.settings.utcOffset ?? "auto",
   });
 }
 
@@ -199,6 +215,7 @@ export interface PeriodExportData {
   tradeImages: TradeImage[];
   journalEntries: JournalEntry[];
   firstThoughts: FirstThought[];
+  mentorConversations: MentorConversation[];
   mentalChecks: MentalCheck[];
   chessStats: ChessStats[];
   readinessRules: ReadinessRule[];
@@ -235,15 +252,23 @@ export async function exportPeriodData(
     if (note) tradeNotes.push(note);
   }
 
-  const [journalEntries, firstThoughts, mentalChecks, chessStats, readinessRules, tradingRules] =
-    await Promise.all([
-      repos.journalEntries.list(),
-      repos.firstThoughts.list(),
-      repos.mentalChecks.list(),
-      repos.chessStats.list(),
-      repos.readinessRules.list(),
-      repos.tradingRules.list(),
-    ]);
+  const [
+    journalEntries,
+    firstThoughts,
+    mentorConversations,
+    mentalChecks,
+    chessStats,
+    readinessRules,
+    tradingRules,
+  ] = await Promise.all([
+    repos.journalEntries.list(),
+    repos.firstThoughts.list(),
+    repos.mentorConversations.list(),
+    repos.mentalChecks.list(),
+    repos.chessStats.list(),
+    repos.readinessRules.list(),
+    repos.tradingRules.list(),
+  ]);
 
   return {
     version: 1,
@@ -255,6 +280,7 @@ export async function exportPeriodData(
     tradeImages,
     journalEntries: journalEntries.filter((e) => inRange(dayOf(e.date), from, to)),
     firstThoughts: firstThoughts.filter((t) => inRange(dayOf(t.date), from, to)),
+    mentorConversations: mentorConversations.filter((c) => inRange(dayOf(c.date), from, to)),
     mentalChecks: mentalChecks.filter((c) => inRange(dayOf(c.date), from, to)),
     chessStats: chessStats.filter((c) => inRange(dayOf(c.date), from, to)),
     readinessRules: readinessRules.filter(

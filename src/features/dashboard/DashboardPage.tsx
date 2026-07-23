@@ -8,6 +8,7 @@ import { formatCurrency, formatPercent, formatSignedPercent } from "@/lib/format
 import { AccountBalancesWidget } from "./components/AccountBalancesWidget";
 import { ChessThermometerCard } from "./components/ChessThermometerCard";
 import { FirstThoughtCard } from "./components/FirstThoughtCard";
+import { MarketSessionsCard } from "./components/MarketSessionsCard";
 import { MyPlanCard } from "./components/MyPlanCard";
 import { RecentTradesWidget } from "./components/RecentTradesWidget";
 
@@ -53,6 +54,8 @@ export function DashboardPage() {
           <p className="mt-1 text-xs text-muted-foreground">— {sessionQuote.source}</p>
         )}
       </div>
+
+      <MarketSessionsCard />
 
       {/* Check-in + cognitive thermometer */}
       <div className="grid gap-6 lg:grid-cols-3">
