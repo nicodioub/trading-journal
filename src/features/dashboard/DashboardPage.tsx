@@ -1,9 +1,9 @@
-import { Flame, Percent, Trophy, TrendingUp } from "lucide-react";
+import { AlertTriangle, Flame, Percent, Trophy, TrendingUp } from "lucide-react";
 import { useMemo } from "react";
 import { StatTile } from "@/components/ui";
 import { useAccounts, useSettings, useTrades } from "@/data";
 import { getSessionSplashQuote } from "@/data/splashQuotes";
-import { computeAccountSummary, computePerformanceStats } from "@/domain";
+import { computeAccountSummary, computePerformanceStats, isLoss, tradeTime } from "@/domain";
 import { formatCurrency, formatPercent, formatSignedPercent } from "@/lib/format";
 import { AccountBalancesWidget } from "./components/AccountBalancesWidget";
 import { ChessThermometerCard } from "./components/ChessThermometerCard";
@@ -43,6 +43,16 @@ export function DashboardPage() {
       ? "—"
       : `${streak.count} ${streak.type}${streak.count > 1 ? "s" : ""}`;
 
+  const todayHasLoss = useMemo(() => {
+    const todayKey = new Date().toDateString();
+    return trades.some(
+      (t) =>
+        t.status === "closed" &&
+        isLoss(t) &&
+        new Date(tradeTime(t)).toDateString() === todayKey,
+    );
+  }, [trades]);
+
   return (
     <div className="space-y-6">
       {/* Motivational banner — same quote shown on the boot splash */}
@@ -54,6 +64,15 @@ export function DashboardPage() {
           <p className="mt-1 text-xs text-muted-foreground">— {sessionQuote.source}</p>
         )}
       </div>
+
+      {todayHasLoss && (
+        <div className="flex items-start gap-3 rounded-lg border border-danger/40 bg-danger/10 px-4 py-3 text-sm text-danger">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+          <p className="font-medium">
+            80% of days that start with a loss end negative—and continuing to trade makes the average loss about 12× larger.
+          </p>
+        </div>
+      )}
 
       <MarketSessionsCard />
 
