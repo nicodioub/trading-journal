@@ -648,6 +648,7 @@ interface FirstThoughtRow {
   chess_context: string;
   weekly_context: string;
   psychological_load: string;
+  daily_risk_context: string;
   behavioral_context: string;
   behavioral_assessment: string;
   biggest_concern: string;
@@ -677,6 +678,7 @@ function rowToFirstThought(row: FirstThoughtRow): FirstThought {
     chessContext: JSON.parse(row.chess_context),
     weeklyContext: JSON.parse(row.weekly_context),
     psychologicalLoad: JSON.parse(row.psychological_load),
+    dailyRiskContext: JSON.parse(row.daily_risk_context),
     behavioralContext: JSON.parse(row.behavioral_context),
     behavioralAssessment: row.behavioral_assessment,
     biggestConcern: row.biggest_concern,
@@ -712,6 +714,7 @@ const firstThoughtRepository: FirstThoughtRepository = {
     const chessContextJson = JSON.stringify(input.chessContext ?? null);
     const weeklyContextJson = JSON.stringify(input.weeklyContext ?? null);
     const psychologicalLoadJson = JSON.stringify(input.psychologicalLoad ?? null);
+    const dailyRiskContextJson = JSON.stringify(input.dailyRiskContext ?? null);
     const behavioralContextJson = JSON.stringify(input.behavioralContext ?? null);
     if (existing) {
       await db.execute(
@@ -719,7 +722,7 @@ const firstThoughtRepository: FirstThoughtRepository = {
           readiness_score=$5, status=$6, alignment_score=$7, confidence_score=$8, primary_focus=$9,
           explanation=$10, biases=$11, strengths=$12, likely_behaviors=$13, reframe=$14, mission=$15,
           suggested_action=$16, ai_observations=$17, chess_context=$18, weekly_context=$19, psychological_load=$20,
-          behavioral_context=$21, behavioral_assessment=$22, biggest_concern=$23
+          behavioral_context=$21, behavioral_assessment=$22, biggest_concern=$23, daily_risk_context=$24
           WHERE date=$1`,
         [
           input.date,
@@ -745,6 +748,7 @@ const firstThoughtRepository: FirstThoughtRepository = {
           behavioralContextJson,
           input.behavioralAssessment ?? "",
           input.biggestConcern ?? "",
+          dailyRiskContextJson,
         ],
       );
       return { ...existing, ...input };
@@ -759,8 +763,8 @@ const firstThoughtRepository: FirstThoughtRepository = {
         (id, date, thought, job_statement, dimensions, readiness_score, status, alignment_score,
          confidence_score, primary_focus, explanation, biases, strengths, likely_behaviors, reframe,
          mission, suggested_action, ai_observations, chess_context, weekly_context, psychological_load,
-         behavioral_context, behavioral_assessment, biggest_concern, created_at)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25)`,
+         behavioral_context, behavioral_assessment, biggest_concern, daily_risk_context, created_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26)`,
       [
         check.id,
         check.date,
@@ -786,6 +790,7 @@ const firstThoughtRepository: FirstThoughtRepository = {
         JSON.stringify(check.behavioralContext),
         check.behavioralAssessment,
         check.biggestConcern,
+        JSON.stringify(check.dailyRiskContext),
         check.createdAt,
       ],
     );
@@ -1192,6 +1197,8 @@ interface SettingsRow {
   motivational_quote: string;
   default_currency: string;
   default_risk_percent: number;
+  normal_daily_risk_percent: number;
+  max_daily_risk_percent: number;
   theme: string;
   chess_com_username: string;
   openai_api_key: string;
@@ -1206,6 +1213,8 @@ function rowToSettings(row: SettingsRow): Settings {
     motivationalQuote: row.motivational_quote,
     defaultCurrency: row.default_currency,
     defaultRiskPercent: row.default_risk_percent,
+    normalDailyRiskPercent: row.normal_daily_risk_percent,
+    maxDailyRiskPercent: row.max_daily_risk_percent,
     theme: row.theme,
     chessComUsername: row.chess_com_username,
     openaiApiKey: row.openai_api_key,
@@ -1226,9 +1235,9 @@ const settingsRepository: SettingsRepository = {
     // Seed defaults on first access.
     const seeded = settingsSchema.parse({ ...DEFAULT_SETTINGS, updatedAt: nowIso() });
     await db.execute(
-      `INSERT INTO settings (id, motivational_quote, default_currency, default_risk_percent, theme, chess_com_username, openai_api_key, trading_plan, utc_offset, updated_at)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
-      [seeded.id, seeded.motivationalQuote, seeded.defaultCurrency, seeded.defaultRiskPercent, seeded.theme, seeded.chessComUsername, seeded.openaiApiKey, seeded.tradingPlan, seeded.utcOffset, seeded.updatedAt],
+      `INSERT INTO settings (id, motivational_quote, default_currency, default_risk_percent, normal_daily_risk_percent, max_daily_risk_percent, theme, chess_com_username, openai_api_key, trading_plan, utc_offset, updated_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
+      [seeded.id, seeded.motivationalQuote, seeded.defaultCurrency, seeded.defaultRiskPercent, seeded.normalDailyRiskPercent, seeded.maxDailyRiskPercent, seeded.theme, seeded.chessComUsername, seeded.openaiApiKey, seeded.tradingPlan, seeded.utcOffset, seeded.updatedAt],
     );
     return seeded;
   },
@@ -1238,9 +1247,9 @@ const settingsRepository: SettingsRepository = {
     const merged = settingsSchema.parse({ ...current, ...patch, id: "default", updatedAt: nowIso() });
     const db = await getDb();
     await db.execute(
-      `UPDATE settings SET motivational_quote=$2, default_currency=$3, default_risk_percent=$4, theme=$5, chess_com_username=$6, openai_api_key=$7, trading_plan=$8, utc_offset=$9, updated_at=$10
+      `UPDATE settings SET motivational_quote=$2, default_currency=$3, default_risk_percent=$4, normal_daily_risk_percent=$5, max_daily_risk_percent=$6, theme=$7, chess_com_username=$8, openai_api_key=$9, trading_plan=$10, utc_offset=$11, updated_at=$12
        WHERE id=$1`,
-      ["default", merged.motivationalQuote, merged.defaultCurrency, merged.defaultRiskPercent, merged.theme, merged.chessComUsername, merged.openaiApiKey, merged.tradingPlan, merged.utcOffset, merged.updatedAt],
+      ["default", merged.motivationalQuote, merged.defaultCurrency, merged.defaultRiskPercent, merged.normalDailyRiskPercent, merged.maxDailyRiskPercent, merged.theme, merged.chessComUsername, merged.openaiApiKey, merged.tradingPlan, merged.utcOffset, merged.updatedAt],
     );
     return merged;
   },

@@ -98,6 +98,41 @@ export const psychologicalLoadSnapshotSchema = z
   .nullable();
 export type PsychologicalLoadSnapshot = z.infer<typeof psychologicalLoadSnapshotSchema>;
 
+const dayRiskUsageSchema = z.object({
+  date: z.string(),
+  trades: z.number(),
+  netPnl: z.number(),
+  netPercent: z.number(),
+  lossPercent: z.number(),
+  exceededNormal: z.boolean(),
+  exceededMax: z.boolean(),
+});
+
+/**
+ * Snapshot of the daily risk budget (declared limits vs. what today and the
+ * previous sessions actually spent) sent to the model at analysis time —
+ * stored rather than recomputed so the card can show the exact numbers that
+ * informed a given day's assessment, even after the limits are changed.
+ */
+export const dailyRiskContextSnapshotSchema = z
+  .object({
+    limits: z.object({
+      normalPercent: z.number(),
+      maxPercent: z.number(),
+    }),
+    today: dayRiskUsageSchema,
+    previousTradingDay: dayRiskUsageSchema.nullable(),
+    daysSincePreviousTradingDay: z.number().nullable(),
+    recentDays: z.array(dayRiskUsageSchema).default([]),
+    windowDays: z.number(),
+    daysOverNormal: z.number(),
+    daysOverMax: z.number(),
+    worstLossPercent: z.number().nullable(),
+    remainingTodayPercent: z.number(),
+  })
+  .nullable();
+export type DailyRiskContextSnapshot = z.infer<typeof dailyRiskContextSnapshotSchema>;
+
 export const behaviorPatternSchema = z.enum([
   "Disciplined",
   "Revenge Trading",
@@ -188,6 +223,8 @@ export const firstThoughtSchema = z.object({
   weeklyContext: weeklyContextSnapshotSchema.default(null),
   /** Deterministic psychological load index derived from the weekly context, or null if not computed. */
   psychologicalLoad: psychologicalLoadSnapshotSchema.default(null),
+  /** Declared daily risk limits vs. what today and recent sessions actually spent, as sent to the model. */
+  dailyRiskContext: dailyRiskContextSnapshotSchema.default(null),
   /** Deterministic Behavior Engine output over the trailing 7 days, or null if there wasn't enough history. */
   behavioralContext: behavioralContextSnapshotSchema.default(null),
   /** The model's longitudinal, coach-style read on the trailing behavioral window — how today's mindset compares to recent days, not just today in isolation. */

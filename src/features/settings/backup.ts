@@ -176,6 +176,8 @@ export async function importData(
     motivationalQuote: data.settings.motivationalQuote,
     defaultCurrency: data.settings.defaultCurrency,
     defaultRiskPercent: data.settings.defaultRiskPercent,
+    normalDailyRiskPercent: data.settings.normalDailyRiskPercent ?? 2,
+    maxDailyRiskPercent: data.settings.maxDailyRiskPercent ?? 3,
     theme: data.settings.theme,
     chessComUsername: data.settings.chessComUsername ?? "",
     openaiApiKey: data.settings.openaiApiKey ?? "",

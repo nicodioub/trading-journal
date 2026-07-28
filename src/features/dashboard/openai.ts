@@ -2,7 +2,9 @@ import type {
   BehavioralContext,
   Bias,
   ChessContext,
+  DailyRiskContext,
   DayBehavior,
+  DayRiskUsage,
   MentalCheck,
   PsychDimensions,
   PsychologicalLoad,
@@ -55,7 +57,14 @@ Write the explanation like a psychologist assessing a patient, not a coach cheer
 "Your wording suggests that avoiding losses has become today's objective. When preventing losses becomes the objective, traders often hesitate on valid setups, move stops prematurely, or skip trades entirely. Your plan should define success—not today's PnL."
 Write 2-4 sentences in this style, tailored to what THIS trader actually wrote — never generic, never a bare verdict like "NO TRADE".
 
-If chess data and/or weekly trading data was provided, weigh it into the explanation as corroborating (or contradicting) evidence: e.g. "Your written mindset appears disciplined, but today's chess performance is well below your normal level, which has historically preceded hesitation and execution errors — be especially selective with entries." or "Your writing sounds process-focused, but you're on a two-loss streak with elevated Psychological Load — watch for an unconscious urge to force a trade to feel back in control." Put this combined read in a separate "aiObservations" field (2-3 sentences), referencing the written signal plus whichever of the chess baseline / weekly trading context / psychological load actually informed the read. Leave aiObservations as an empty string if neither chess nor weekly trading data was provided.
+If chess data and/or weekly trading data was provided, weigh it into the explanation as corroborating (or contradicting) evidence: e.g. "Your written mindset appears disciplined, but today's chess performance is well below your normal level, which has historically preceded hesitation and execution errors — be especially selective with entries." or "Your writing sounds process-focused, but you're on a two-loss streak with elevated Psychological Load — watch for an unconscious urge to force a trade to feel back in control." Put this combined read in a separate "aiObservations" field (2-3 sentences), referencing the written signal plus whichever of the chess baseline / weekly trading context / psychological load / daily risk budget actually informed the read. Leave aiObservations as an empty string if neither chess nor weekly trading data was provided.
+
+Sometimes you will also receive a "Daily Risk Budget" block: the risk-per-day limits the trader has declared for themselves (a normal day's allowance and a hard ceiling, both as a % of account equity), what today has already spent, what their previous trading session cost them, and how many days in the recent window went past each limit. When this block is present it is high-priority evidence — a session that breached the ceiling is usually the single loudest thing in a trader's head the next morning, and you must not write as if it didn't happen:
+- If the previous session exceeded the declared maximum, name it explicitly with the actual number and the limit it broke (e.g. "yesterday cost 4.1% against a 3% ceiling"). Then read today's writing specifically for whether the trader is carrying it — an urge to recover it, a defensive shrinking away from valid setups, or genuine acceptance. Do not assume which; the writing decides. A check-in that never mentions a breach that large is itself informative — the loss is either processed or suppressed, and the wording usually tells you which.
+- Treat overspending the budget as a PROCESS failure, never as proof the trader is bad at trading, and never as a debt to be earned back. Say plainly that the money is gone and the only thing today can control is execution.
+- Repeated breaches in the window matter more than one: a single 4% day is an incident, three in two weeks is a risk-management pattern, and you should name it as such.
+- When today has already spent part of the budget, your suggestedAction must fit inside what is actually left — never suggest sizing or activity that would need more room than remains, and if the ceiling is already reached, say the day's risk budget is spent.
+- Never invent or restate these numbers wrong: quote only the figures given to you.
 
 Sometimes you will also receive "Today's mental check" (self-rated mood/confidence/stress/energy and sleep) and "Currently open positions". Open positions matter psychologically: a trader with open risk who writes about "making it back" or checks their thought against a running position is in a different state than one starting flat. Use the mental check as another corroborating signal against the writing — e.g. high self-rated confidence next to writing that sounds fearful is itself informative.
 
@@ -167,6 +176,54 @@ function describeWeeklyContext(
   return parts.join("\n");
 }
 
+/** "−4.1% (2 trades)" / "+1.2% (1 trade)" — a day's result against the budget. */
+function describeDay(day: DayRiskUsage): string {
+  const sign = day.netPercent >= 0 ? "+" : "−";
+  return `${sign}${Math.abs(day.netPercent).toFixed(2)}% (${day.trades} trade${day.trades === 1 ? "" : "s"})`;
+}
+
+function describeDailyRisk(risk: DailyRiskContext | null): string | null {
+  if (!risk) return null;
+  const { limits, today, previousTradingDay } = risk;
+
+  const parts = [
+    `Declared limits: normal risk per day ${limits.normalPercent}% of account, hard maximum ${limits.maxPercent}%`,
+    today.trades > 0
+      ? `Today so far: ${describeDay(today)}${today.exceededMax ? " — ALREADY PAST TODAY'S MAXIMUM" : today.exceededNormal ? " — already past a normal day's risk" : ""}`
+      : "Today so far: no closed trades yet",
+    `Risk budget left today: ${risk.remainingTodayPercent.toFixed(2)} percentage points of the ${limits.maxPercent}% maximum`,
+  ];
+
+  if (previousTradingDay) {
+    const when =
+      risk.daysSincePreviousTradingDay === 1
+        ? "Yesterday"
+        : `Previous trading session (${risk.daysSincePreviousTradingDay} days ago, ${previousTradingDay.date})`;
+    const breach = previousTradingDay.exceededMax
+      ? ` — BREACHED the ${limits.maxPercent}% maximum by ${(previousTradingDay.lossPercent - limits.maxPercent).toFixed(2)} points`
+      : previousTradingDay.exceededNormal
+        ? ` — past the ${limits.normalPercent}% normal daily risk`
+        : "";
+    parts.push(`${when}: ${describeDay(previousTradingDay)}${breach}`);
+  }
+
+  parts.push(
+    `Last ${risk.windowDays} days: ${risk.daysOverNormal} day(s) over the normal daily risk, ${risk.daysOverMax} day(s) over the maximum${
+      risk.worstLossPercent !== null ? `, worst single day −${risk.worstLossPercent.toFixed(2)}%` : ""
+    }`,
+  );
+
+  if (risk.recentDays.length > 0) {
+    const recent = risk.recentDays
+      .slice(0, 5)
+      .map((d) => `${d.date}: ${describeDay(d)}${d.exceededMax ? " ⚠ over max" : d.exceededNormal ? " ⚠ over normal" : ""}`)
+      .join("; ");
+    parts.push(`Recent trading days: ${recent}`);
+  }
+
+  return parts.join("\n");
+}
+
 function describeBehaviorWindow(window: DayBehavior[] | null): string | null {
   if (!window) return null;
   const relevant = window.filter((d) => d.firstThought || d.declaredStatus || d.trades.count > 0);
@@ -239,6 +296,7 @@ export interface AnalysisContext {
   chess?: ChessContext | null;
   weekly?: WeeklyTradingContext | null;
   psychLoad?: PsychologicalLoad | null;
+  dailyRisk?: DailyRiskContext | null;
   behaviorWindow?: DayBehavior[] | null;
   behavioralContext?: BehavioralContext | null;
   mentalCheck?: MentalCheck | null;
@@ -247,8 +305,8 @@ export interface AnalysisContext {
 
 /**
  * Sends the trader's first thought + job statement, plus whatever context is
- * available (Cognitive Thermometer, weekly trading, 7-day behavioral window,
- * today's mental check, open positions), to GPT-4o for a full psychological
+ * available (Cognitive Thermometer, weekly trading, daily risk budget, 7-day
+ * behavioral window, today's mental check, open positions), to GPT-4o for a full psychological
  * breakdown. Requires an OpenAI API key configured in Settings. The readiness
  * score/status are computed locally (see domain/services/psychology) so
  * scoring stays deterministic rather than left to the model.
@@ -261,6 +319,7 @@ export async function analyzeFirstThought(
 ): Promise<FirstThoughtAnalysis> {
   const chessBlock = describeChessContext(context.chess ?? null);
   const weeklyBlock = describeWeeklyContext(context.weekly ?? null, context.psychLoad ?? null);
+  const dailyRiskBlock = describeDailyRisk(context.dailyRisk ?? null);
   const behaviorWindowBlock = describeBehaviorWindow(context.behaviorWindow ?? null);
   const behavioralContextBlock = describeBehavioralContext(context.behavioralContext ?? null);
   const mentalCheckBlock = describeMentalCheck(context.mentalCheck ?? null);
@@ -272,6 +331,7 @@ export async function analyzeFirstThought(
     mentalCheckBlock ? `Today's mental check: ${mentalCheckBlock}` : null,
     openPositionsBlock ? `Currently open positions:\n${openPositionsBlock}` : null,
     chessBlock ? `Cognitive Thermometer:\n${chessBlock}` : null,
+    dailyRiskBlock ? `Daily Risk Budget:\n${dailyRiskBlock}` : null,
     weeklyBlock ? `This week's trading:\n${weeklyBlock}` : null,
     behaviorWindowBlock ? `7-Day Behavioral History:\n${behaviorWindowBlock}` : null,
     behavioralContextBlock ? `Behavioral Context:\n${behavioralContextBlock}` : null,

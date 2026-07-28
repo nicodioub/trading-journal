@@ -11,6 +11,7 @@ import {
   Textarea,
 } from "@/components/ui";
 import {
+  useAccounts,
   useChessStatsList,
   useFirstThought,
   useFirstThoughts,
@@ -21,12 +22,20 @@ import {
   useSettings,
   useTrades,
 } from "@/data";
-import type { BehaviorPattern, DayBehavior, FirstThoughtStatus, PsychDimensions, TrajectoryState } from "@/domain";
+import type {
+  BehaviorPattern,
+  DailyRiskContextSnapshot,
+  DayBehavior,
+  FirstThoughtStatus,
+  PsychDimensions,
+  TrajectoryState,
+} from "@/domain";
 import {
   applyChessAdjustment,
   buildBehaviorWindow,
   computeBehavioralContext,
   computeChessContext,
+  computeDailyRiskContext,
   computePsychologicalLoad,
   computeReadinessComparison,
   computeReadinessScore,
@@ -34,6 +43,7 @@ import {
   deriveRisks,
   statusForScore,
 } from "@/domain";
+import { formatSignedPercent } from "@/lib/format";
 import { todayKey } from "../utils";
 import { analyzeFirstThought } from "../openai";
 
@@ -192,6 +202,93 @@ function EvidenceRow({
   );
 }
 
+/**
+ * The declared daily risk budget against what's actually been spent — today
+ * and on the previous session. This is the evidence behind the check-in's
+ * read on a heavy loss day, shown exactly as it was sent to the model.
+ */
+function RiskBudgetPanel({ risk }: { risk: NonNullable<DailyRiskContextSnapshot> }) {
+  const { limits, today, previousTradingDay } = risk;
+  const spentFraction = limits.maxPercent > 0 ? today.lossPercent / limits.maxPercent : 0;
+  const barTone = today.exceededMax
+    ? "bg-danger"
+    : today.exceededNormal
+      ? "bg-warning"
+      : "bg-primary/70";
+
+  const previousLabel =
+    risk.daysSincePreviousTradingDay === 1
+      ? "Yesterday"
+      : `Last session (${previousTradingDay?.date ?? "—"})`;
+
+  return (
+    <div className="space-y-3 rounded-lg border border-border bg-background/40 px-4 py-3">
+      <div className="flex items-center justify-between">
+        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+          Daily Risk Budget
+        </p>
+        <span className="text-xs text-muted-foreground">
+          normal {limits.normalPercent}% · max {limits.maxPercent}%
+        </span>
+      </div>
+
+      <div className="space-y-1.5">
+        <div className="flex items-baseline justify-between text-sm">
+          <span className="text-muted-foreground">
+            Today {today.trades > 0 ? `· ${today.trades} trade${today.trades > 1 ? "s" : ""}` : "· no trades yet"}
+          </span>
+          <span
+            className={`font-semibold tabular-nums ${
+              today.netPercent < 0 ? "text-danger" : today.netPercent > 0 ? "text-success" : ""
+            }`}
+          >
+            {formatSignedPercent(today.netPercent)}
+          </span>
+        </div>
+        <div className="h-1.5 overflow-hidden rounded-full bg-muted">
+          <div
+            className={`h-full rounded-full transition-all ${barTone}`}
+            style={{ width: `${Math.min(100, Math.max(0, spentFraction * 100))}%` }}
+          />
+        </div>
+        <p className="text-xs text-muted-foreground">
+          {today.exceededMax
+            ? "Today's risk budget is spent."
+            : `${risk.remainingTodayPercent.toFixed(2)} points of the ${limits.maxPercent}% ceiling left today.`}
+        </p>
+      </div>
+
+      {previousTradingDay && (
+        <div
+          className={`rounded-md border px-3 py-2 text-sm ${
+            previousTradingDay.exceededMax
+              ? "border-danger/40 bg-danger/10 text-danger"
+              : previousTradingDay.exceededNormal
+                ? "border-warning/40 bg-warning/10 text-warning"
+                : "border-border text-muted-foreground"
+          }`}
+        >
+          <span className="font-medium">{previousLabel}:</span>{" "}
+          {formatSignedPercent(previousTradingDay.netPercent)}
+          {previousTradingDay.exceededMax
+            ? ` — over your ${limits.maxPercent}% maximum`
+            : previousTradingDay.exceededNormal
+              ? ` — over a normal ${limits.normalPercent}% day`
+              : ""}
+        </div>
+      )}
+
+      {(risk.daysOverNormal > 0 || risk.daysOverMax > 0) && (
+        <p className="text-xs text-muted-foreground">
+          Last {risk.windowDays} days: {risk.daysOverNormal} day
+          {risk.daysOverNormal === 1 ? "" : "s"} over normal · {risk.daysOverMax} over max
+          {risk.worstLossPercent !== null && <> · worst −{risk.worstLossPercent.toFixed(2)}%</>}
+        </p>
+      )}
+    </div>
+  );
+}
+
 /** "Today" / "Yesterday" / "N days ago" from two yyyy-MM-dd strings. */
 function relativeLabel(dayIso: string, todayIso: string): string {
   const diff = Math.round((new Date(todayIso).getTime() - new Date(dayIso).getTime()) / 86_400_000);
@@ -225,6 +322,7 @@ export function FirstThoughtCard() {
   const { data: history = [] } = useFirstThoughts();
   const { data: chessStats = [] } = useChessStatsList();
   const { data: trades = [] } = useTrades();
+  const { data: accounts = [] } = useAccounts();
   const { data: readinessRules = [] } = useReadinessRules();
   const { data: journalEntries = [] } = useJournalEntries();
   const { data: mentalCheck } = useMentalCheck(date);
@@ -261,11 +359,21 @@ export function FirstThoughtCard() {
       const psychologicalLoad = computePsychologicalLoad(weeklyContext, chessContext);
       const behaviorWindow = buildBehaviorWindow(history, readinessRules, trades, journalEntries, date, 7);
       const behavioralContext = computeBehavioralContext(behaviorWindow);
+      const dailyRisk = computeDailyRiskContext(
+        trades,
+        accounts,
+        {
+          normalPercent: settings.normalDailyRiskPercent,
+          maxPercent: settings.maxDailyRiskPercent,
+        },
+        date,
+      );
       const analysis = await analyzeFirstThought(trimmedThought, trimmedJob, settings.openaiApiKey, {
         plan: settings.tradingPlan,
         chess: chessContext,
         weekly: weeklyContext.trades > 0 ? weeklyContext : null,
         psychLoad: weeklyContext.trades > 0 ? psychologicalLoad : null,
+        dailyRisk,
         behaviorWindow,
         behavioralContext,
         mentalCheck,
@@ -289,6 +397,7 @@ export function FirstThoughtCard() {
         chessContext,
         weeklyContext: weeklyContext.trades > 0 ? weeklyContext : null,
         psychologicalLoad: weeklyContext.trades > 0 ? psychologicalLoad : null,
+        dailyRiskContext: dailyRisk,
         behavioralContext,
         behavioralAssessment: analysis.behavioralAssessment,
         biggestConcern: analysis.biggestConcern,
@@ -446,6 +555,8 @@ export function FirstThoughtCard() {
                 )}
               </div>
             )}
+
+            {result.dailyRiskContext && <RiskBudgetPanel risk={result.dailyRiskContext} />}
 
             {result.aiObservations && (
               <div className="space-y-1 rounded-lg border border-border bg-background/40 px-4 py-3">

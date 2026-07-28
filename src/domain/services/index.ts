@@ -7,3 +7,4 @@ export * from "./chessStats";
 export * from "./correlation";
 export * from "./planning";
 export * from "./psychology";
+export * from "./riskBudget";

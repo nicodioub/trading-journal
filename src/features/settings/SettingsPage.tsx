@@ -54,6 +54,8 @@ export function SettingsPage() {
   const [motivationalQuote, setQuote] = useState("");
   const [defaultCurrency, setCurrency] = useState("USD");
   const [defaultRiskPercent, setRisk] = useState("1");
+  const [normalDailyRiskPercent, setNormalDailyRisk] = useState("2");
+  const [maxDailyRiskPercent, setMaxDailyRisk] = useState("3");
   const [theme, setTheme] = useState<Theme>("dark");
   const [chessComUsername, setChessComUsername] = useState("");
   const [openaiApiKey, setOpenaiApiKey] = useState("");
@@ -74,6 +76,8 @@ export function SettingsPage() {
       setQuote(settings.motivationalQuote);
       setCurrency(settings.defaultCurrency);
       setRisk(String(settings.defaultRiskPercent));
+      setNormalDailyRisk(String(settings.normalDailyRiskPercent));
+      setMaxDailyRisk(String(settings.maxDailyRiskPercent));
       setTheme(settings.theme);
       setChessComUsername(settings.chessComUsername);
       setOpenaiApiKey(settings.openaiApiKey);
@@ -86,6 +90,8 @@ export function SettingsPage() {
       motivationalQuote,
       defaultCurrency,
       defaultRiskPercent: Number(defaultRiskPercent) || 0,
+      normalDailyRiskPercent: Math.max(0, Number(normalDailyRiskPercent) || 0),
+      maxDailyRiskPercent: Math.max(0, Number(maxDailyRiskPercent) || 0),
       theme,
       chessComUsername: chessComUsername.trim(),
       openaiApiKey: openaiApiKey.trim(),
@@ -214,6 +220,53 @@ export function SettingsPage() {
                 Sets the timezone for the market-sessions clock on your dashboard.
               </p>
             </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Daily risk budget</CardTitle>
+            <CardDescription>
+              How much of the account you allow yourself to lose in a single day.
+              Your check-in measures every session against these limits, so a day
+              that blew past the ceiling is weighed into the next morning's read.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-1.5">
+              <Label htmlFor="set-normal-daily-risk">Normal risk per day %</Label>
+              <Input
+                id="set-normal-daily-risk"
+                type="number"
+                min="0"
+                step="0.1"
+                value={normalDailyRiskPercent}
+                onChange={(e) => setNormalDailyRisk(e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">
+                An ordinary day's allowance. Past this, the day is unusual.
+              </p>
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="set-max-daily-risk">Max risk per day %</Label>
+              <Input
+                id="set-max-daily-risk"
+                type="number"
+                min="0"
+                step="0.1"
+                value={maxDailyRiskPercent}
+                onChange={(e) => setMaxDailyRisk(e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">
+                The hard ceiling. Past this, the day is over.
+              </p>
+            </div>
+            {Number(maxDailyRiskPercent) < Number(normalDailyRiskPercent) && (
+              <p className="text-xs text-warning sm:col-span-2">
+                Your maximum is below your normal daily risk — every normal day
+                would count as a breach.
+              </p>
+            )}
           </CardContent>
         </Card>
 

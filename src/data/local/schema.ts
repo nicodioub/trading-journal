@@ -241,4 +241,12 @@ export const MIGRATIONS: Migration[] = [
       `ALTER TABLE settings ADD COLUMN utc_offset TEXT NOT NULL DEFAULT 'auto';`,
     ],
   },
+  {
+    version: 12,
+    statements: [
+      `ALTER TABLE settings ADD COLUMN normal_daily_risk_percent REAL NOT NULL DEFAULT 2;`,
+      `ALTER TABLE settings ADD COLUMN max_daily_risk_percent REAL NOT NULL DEFAULT 3;`,
+      `ALTER TABLE first_thoughts ADD COLUMN daily_risk_context TEXT NOT NULL DEFAULT 'null';`,
+    ],
+  },
 ];

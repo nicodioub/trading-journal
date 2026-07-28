@@ -1,10 +1,17 @@
-import { AlertTriangle, Flame, Percent, Trophy, TrendingUp } from "lucide-react";
+import { AlertTriangle, Flame, LineChart, Percent, Trophy, TrendingUp } from "lucide-react";
 import { useMemo } from "react";
 import { StatTile } from "@/components/ui";
 import { useAccounts, useSettings, useTrades } from "@/data";
 import { getSessionSplashQuote } from "@/data/splashQuotes";
-import { computeAccountSummary, computePerformanceStats, isLoss, tradeTime } from "@/domain";
+import {
+  computeAccountSummary,
+  computeDailyRiskContext,
+  computePerformanceStats,
+  isLoss,
+  tradeTime,
+} from "@/domain";
 import { formatCurrency, formatPercent, formatSignedPercent } from "@/lib/format";
+import { todayKey } from "./utils";
 import { AccountBalancesWidget } from "./components/AccountBalancesWidget";
 import { ChessThermometerCard } from "./components/ChessThermometerCard";
 import { FirstThoughtCard } from "./components/FirstThoughtCard";
@@ -53,6 +60,36 @@ export function DashboardPage() {
     );
   }, [trades]);
 
+  // Nothing entered today and nothing still open — the session hasn't started,
+  // so the banner slot carries the pre-session order of operations instead of
+  // a warning about a day that hasn't happened yet.
+  const sessionNotStarted = useMemo(() => {
+    const today = new Date().toDateString();
+    const isToday = (iso: string | null) => iso !== null && new Date(iso).toDateString() === today;
+    return !trades.some(
+      (t) => t.status === "open" || isToday(t.date) || isToday(t.closedAt),
+    );
+  }, [trades]);
+
+  // Today's and the previous session's spend against the declared daily limits.
+  const dailyRisk = useMemo(
+    () =>
+      computeDailyRiskContext(
+        trades,
+        accounts,
+        {
+          normalPercent: settings?.normalDailyRiskPercent ?? 0,
+          maxPercent: settings?.maxDailyRiskPercent ?? 0,
+        },
+        todayKey(),
+      ),
+    [trades, accounts, settings?.normalDailyRiskPercent, settings?.maxDailyRiskPercent],
+  );
+
+  const previousDay = dailyRisk.previousTradingDay;
+  const previousDayLabel =
+    dailyRisk.daysSincePreviousTradingDay === 1 ? "Yesterday" : "Your last session";
+
   return (
     <div className="space-y-6">
       {/* Motivational banner — same quote shown on the boot splash */}
@@ -65,11 +102,42 @@ export function DashboardPage() {
         )}
       </div>
 
+      {previousDay?.exceededMax && (
+        <div className="flex items-start gap-3 rounded-lg border border-danger/40 bg-danger/10 px-4 py-3 text-sm text-danger">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+          <p className="font-medium">
+            {previousDayLabel} cost {formatSignedPercent(previousDay.netPercent)} against your{" "}
+            {dailyRisk.limits.maxPercent}% daily ceiling. That money is spent — today can only
+            be judged on execution, not on earning it back.
+          </p>
+        </div>
+      )}
+
+      {sessionNotStarted && (
+        <div className="flex items-start gap-3 rounded-lg border border-primary/30 bg-primary/5 px-4 py-3 text-sm">
+          <LineChart className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+          <p className="font-medium">
+            Nothing traded yet today. Open TradingView first and do the deep analysis —
+            MT5 comes after, and only if the analysis actually hands you a setup.
+          </p>
+        </div>
+      )}
+
       {todayHasLoss && (
         <div className="flex items-start gap-3 rounded-lg border border-danger/40 bg-danger/10 px-4 py-3 text-sm text-danger">
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
           <p className="font-medium">
             80% of days that start with a loss end negative—and continuing to trade makes the average loss about 12× larger.
+            {dailyRisk.limits.maxPercent > 0 && dailyRisk.today.lossPercent > 0 && (
+              <>
+                {" "}
+                Today has used {dailyRisk.today.lossPercent.toFixed(2)} of your{" "}
+                {dailyRisk.limits.maxPercent}% daily risk budget
+                {dailyRisk.today.exceededMax
+                  ? " — the ceiling is reached."
+                  : `, ${dailyRisk.remainingTodayPercent.toFixed(2)} points left.`}
+              </>
+            )}
           </p>
         </div>
       )}
