@@ -249,4 +249,15 @@ export const MIGRATIONS: Migration[] = [
       `ALTER TABLE first_thoughts ADD COLUMN daily_risk_context TEXT NOT NULL DEFAULT 'null';`,
     ],
   },
+  {
+    version: 13,
+    statements: [
+      `CREATE TABLE IF NOT EXISTS checklist_items (
+        id TEXT PRIMARY KEY,
+        label TEXT NOT NULL,
+        checked INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL
+      );`,
+    ],
+  },
 ];

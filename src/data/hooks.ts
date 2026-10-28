@@ -5,6 +5,7 @@ import {
 } from "@tanstack/react-query";
 import type {
   AccountInput,
+  ChecklistItemInput,
   ChessStatsInput,
   FirstThoughtInput,
   JournalEntryInput,
@@ -41,6 +42,7 @@ export const queryKeys = {
   chessStatsLatest: ["chessStats", "latest"] as const,
   journalEntries: ["journalEntries"] as const,
   tradingRules: ["tradingRules"] as const,
+  checklistItems: ["checklistItems"] as const,
   settings: ["settings"] as const,
 };
 
@@ -458,6 +460,53 @@ export function useDeleteTradingRule() {
   return useMutation({
     mutationFn: (id: string) => repos.tradingRules.delete(id),
     onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.tradingRules }),
+  });
+}
+
+/* ------------------------- Pre-trade checklist ------------------------- */
+
+export function useChecklistItems() {
+  const repos = useRepositories();
+  return useQuery({
+    queryKey: queryKeys.checklistItems,
+    queryFn: () => repos.checklistItems.list(),
+  });
+}
+
+export function useCreateChecklistItem() {
+  const repos = useRepositories();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: ChecklistItemInput) => repos.checklistItems.create(input),
+    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.checklistItems }),
+  });
+}
+
+export function useUpdateChecklistItem() {
+  const repos = useRepositories();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, patch }: { id: string; patch: Partial<ChecklistItemInput> }) =>
+      repos.checklistItems.update(id, patch),
+    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.checklistItems }),
+  });
+}
+
+export function useDeleteChecklistItem() {
+  const repos = useRepositories();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => repos.checklistItems.delete(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.checklistItems }),
+  });
+}
+
+export function useResetChecklist() {
+  const repos = useRepositories();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => repos.checklistItems.uncheckAll(),
+    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.checklistItems }),
   });
 }
 

@@ -1,6 +1,7 @@
 import type { Repositories } from "@/data";
 import type {
   Account,
+  ChecklistItem,
   ChessStats,
   FirstThought,
   JournalEntry,
@@ -33,6 +34,7 @@ export interface BackupData {
   chessStats: ChessStats[];
   journalEntries: JournalEntry[];
   tradingRules: TradingRule[];
+  checklistItems: ChecklistItem[];
   settings: Settings;
 }
 
@@ -63,6 +65,7 @@ export async function exportData(repos: Repositories): Promise<BackupData> {
     chessStats: await repos.chessStats.list(),
     journalEntries: await repos.journalEntries.list(),
     tradingRules: await repos.tradingRules.list(),
+    checklistItems: await repos.checklistItems.list(),
     settings: await repos.settings.get(),
   };
 }
@@ -170,6 +173,13 @@ export async function importData(
     void id;
     void createdAt;
     await repos.tradingRules.create(input);
+  }
+
+  for (const item of data.checklistItems ?? []) {
+    const { id, createdAt, ...input } = item;
+    void id;
+    void createdAt;
+    await repos.checklistItems.create(input);
   }
 
   await repos.settings.update({

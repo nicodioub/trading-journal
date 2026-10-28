@@ -2,6 +2,8 @@ import type {
   Account,
   AccountInput,
   ChessStats,
+  ChecklistItem,
+  ChecklistItemInput,
   ChessStatsInput,
   Direction,
   FirstThought,
@@ -136,6 +138,15 @@ export interface TradingRuleRepository {
   delete(id: string): Promise<void>;
 }
 
+export interface ChecklistItemRepository {
+  list(): Promise<ChecklistItem[]>;
+  create(input: ChecklistItemInput): Promise<ChecklistItem>;
+  update(id: string, patch: Partial<ChecklistItemInput>): Promise<ChecklistItem>;
+  delete(id: string): Promise<void>;
+  /** Uncheck every item (the user's manual reset). */
+  uncheckAll(): Promise<void>;
+}
+
 export interface SettingsRepository {
   get(): Promise<Settings>;
   update(patch: Partial<Omit<Settings, "id">>): Promise<Settings>;
@@ -168,6 +179,7 @@ export interface Repositories {
   chessStats: ChessStatsRepository;
   journalEntries: JournalEntryRepository;
   tradingRules: TradingRuleRepository;
+  checklistItems: ChecklistItemRepository;
   settings: SettingsRepository;
   images: ImageStorage;
   /** Wipe all data (used by backup-restore and the Settings reset). */

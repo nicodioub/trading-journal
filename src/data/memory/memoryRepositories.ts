@@ -1,6 +1,7 @@
 import { format } from "date-fns";
 import {
   accountSchema,
+  checklistItemSchema,
   chessStatsSchema,
   DEFAULT_SETTINGS,
   firstThoughtSchema,
@@ -16,6 +17,7 @@ import {
   tradeSchema,
   tradingRuleSchema,
   type Account,
+  type ChecklistItem,
   type ChessStats,
   type FirstThought,
   type JournalEntry,
@@ -58,6 +60,7 @@ interface Snapshot {
   chessStats: ChessStats[];
   journalEntries: JournalEntry[];
   tradingRules: TradingRule[];
+  checklistItems: ChecklistItem[];
   settings: Settings | null;
 }
 
@@ -78,6 +81,7 @@ class MemoryStore {
   chessStats: ChessStats[] = [];
   journalEntries: JournalEntry[] = [];
   tradingRules: TradingRule[] = [];
+  checklistItems: ChecklistItem[] = [];
   settings: Settings | null = null;
   images = new Map<string, string>();
 
@@ -101,6 +105,8 @@ class MemoryStore {
         const parsed = mentorConversationSchema.safeParse(c);
         return parsed.success ? [parsed.data] : [];
       });
+      // Snapshots saved before the checklist existed won't have this key.
+      this.checklistItems = this.checklistItems ?? [];
       if (this.settings) {
         this.settings = settingsSchema.parse(this.settings);
       }
@@ -123,6 +129,7 @@ class MemoryStore {
       chessStats: this.chessStats,
       journalEntries: this.journalEntries,
       tradingRules: this.tradingRules,
+      checklistItems: this.checklistItems,
       settings: this.settings,
     };
     try {
@@ -523,6 +530,34 @@ export function createMemoryRepositories(): Repositories {
       },
     },
 
+    checklistItems: {
+      async list() {
+        return [...store.checklistItems].sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+      },
+      async create(input) {
+        const item = checklistItemSchema.parse({ ...input, id: createId(), createdAt: nowIso() });
+        store.checklistItems.push(item);
+        store.persist();
+        return item;
+      },
+      async update(id, patch) {
+        const existing = store.checklistItems.find((i) => i.id === id);
+        if (!existing) throw new Error(`Checklist item ${id} not found`);
+        const merged = checklistItemSchema.parse({ ...existing, ...patch, id });
+        store.checklistItems = store.checklistItems.map((i) => (i.id === id ? merged : i));
+        store.persist();
+        return merged;
+      },
+      async delete(id) {
+        store.checklistItems = store.checklistItems.filter((i) => i.id !== id);
+        store.persist();
+      },
+      async uncheckAll() {
+        store.checklistItems = store.checklistItems.map((i) => ({ ...i, checked: false }));
+        store.persist();
+      },
+    },
+
     settings: {
       async get() {
         if (store.settings) return store.settings;
@@ -555,6 +590,7 @@ export function createMemoryRepositories(): Repositories {
       store.chessStats = [];
       store.journalEntries = [];
       store.tradingRules = [];
+      store.checklistItems = [];
       store.settings = null;
       store.images.clear();
       store.persist();

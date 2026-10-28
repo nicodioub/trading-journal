@@ -40,6 +40,9 @@ const JournalPage = lazy(() =>
 const RulesPage = lazy(() =>
   import("@/features/rules/RulesPage").then((m) => ({ default: m.RulesPage })),
 );
+const ChecklistPage = lazy(() =>
+  import("@/features/checklist/ChecklistPage").then((m) => ({ default: m.ChecklistPage })),
+);
 const PlanningPage = lazy(() =>
   import("@/features/planning/PlanningPage").then((m) => ({ default: m.PlanningPage })),
 );
@@ -71,6 +74,7 @@ export const router = createHashRouter([
       { path: "mentor", element: <MentorPage /> },
       { path: "journal", element: <JournalPage /> },
       { path: "rules", element: <RulesPage /> },
+      { path: "checklist", element: <ChecklistPage /> },
       { path: "planning", element: <PlanningPage /> },
       { path: "news", element: <NewsPage /> },
       { path: "settings", element: <SettingsPage /> },

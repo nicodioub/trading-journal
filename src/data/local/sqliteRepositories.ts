@@ -1,5 +1,6 @@
 import {
   accountSchema,
+  checklistItemSchema,
   chessStatsSchema,
   DEFAULT_SETTINGS,
   firstThoughtSchema,
@@ -15,6 +16,7 @@ import {
   tradeSchema,
   tradingRuleSchema,
   type Account,
+  type ChecklistItem,
   type ChessStats,
   type FirstThought,
   type JournalEntry,
@@ -31,6 +33,7 @@ import {
 import { createId } from "@/lib/utils";
 import type {
   AccountRepository,
+  ChecklistItemRepository,
   ChessStatsRepository,
   FirstThoughtRepository,
   JournalEntryRepository,
@@ -1189,6 +1192,76 @@ const tradingRuleRepository: TradingRuleRepository = {
 };
 
 /* ------------------------------------------------------------------ *
+ * Pre-trade checklist
+ * ------------------------------------------------------------------ */
+
+interface ChecklistItemRow {
+  id: string;
+  label: string;
+  checked: number;
+  created_at: string;
+}
+
+function rowToChecklistItem(row: ChecklistItemRow): ChecklistItem {
+  return checklistItemSchema.parse({
+    id: row.id,
+    label: row.label,
+    checked: row.checked === 1,
+    createdAt: row.created_at,
+  });
+}
+
+const checklistItemRepository: ChecklistItemRepository = {
+  async list() {
+    const db = await getDb();
+    const rows = await db.select<ChecklistItemRow[]>(
+      "SELECT * FROM checklist_items ORDER BY created_at ASC",
+    );
+    return rows.map(rowToChecklistItem);
+  },
+
+  async create(input) {
+    const db = await getDb();
+    const item = checklistItemSchema.parse({
+      ...input,
+      id: createId(),
+      createdAt: nowIso(),
+    });
+    await db.execute(
+      `INSERT INTO checklist_items (id, label, checked, created_at) VALUES ($1,$2,$3,$4)`,
+      [item.id, item.label, item.checked ? 1 : 0, item.createdAt],
+    );
+    return item;
+  },
+
+  async update(id, patch) {
+    const db = await getDb();
+    const rows = await db.select<ChecklistItemRow[]>(
+      "SELECT * FROM checklist_items WHERE id = $1",
+      [id],
+    );
+    if (!rows[0]) throw new Error(`Checklist item ${id} not found`);
+    const merged = checklistItemSchema.parse({ ...rowToChecklistItem(rows[0]), ...patch });
+    await db.execute(`UPDATE checklist_items SET label=$2, checked=$3 WHERE id=$1`, [
+      merged.id,
+      merged.label,
+      merged.checked ? 1 : 0,
+    ]);
+    return merged;
+  },
+
+  async delete(id) {
+    const db = await getDb();
+    await db.execute("DELETE FROM checklist_items WHERE id = $1", [id]);
+  },
+
+  async uncheckAll() {
+    const db = await getDb();
+    await db.execute("UPDATE checklist_items SET checked = 0");
+  },
+};
+
+/* ------------------------------------------------------------------ *
  * Settings (singleton)
  * ------------------------------------------------------------------ */
 
@@ -1271,6 +1344,7 @@ async function resetDatabase(): Promise<void> {
     "chess_stats",
     "journal_entries",
     "trading_rules",
+    "checklist_items",
     "settings",
   ]) {
     await db.execute(`DELETE FROM ${table}`);
@@ -1292,6 +1366,7 @@ export function createSqliteRepositories(): Repositories {
     chessStats: chessStatsRepository,
     journalEntries: journalEntryRepository,
     tradingRules: tradingRuleRepository,
+    checklistItems: checklistItemRepository,
     settings: settingsRepository,
     images: tauriImageStorage,
     reset: resetDatabase,
